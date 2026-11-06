@@ -1,8 +1,13 @@
 -> {
-unless true; 1; end
+unless true
+1
+end
 
 unless true
-1;else;2;end
+1
+else
+2
+end
 
 1 unless true
 
