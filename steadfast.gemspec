@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
   s.rdoc_options = ["--title", "Steadfast", "--main", "README.md"]
   s.extra_rdoc_files = ["README.md"]
   s.require_paths = ["lib"]
-  s.required_ruby_version = '>= 4.0'
+  s.required_ruby_version = '>= 4.1.0-preview1'
 
   s.add_runtime_dependency      'debug_inspector'
   s.add_development_dependency  'minitest'
