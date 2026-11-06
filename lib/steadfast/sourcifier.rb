@@ -1,8 +1,8 @@
 module Steadfast
   class Sourcifier < Ruby::Prism::BasicVisitor
     VISIT_PLANS = {
-      alias_global_variable:      [:keyword_loc, :new_name, :old_name],
-      alias_method:               [:keyword_loc, :new_name, :old_name],
+      alias_global_variable:      [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
+      alias_method:               [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
       and:                        [:left, :whitespace, :operator_loc, :whitespace, :right],
       assoc:                      [:key, :whitespace, :operator_loc, :whitespace, :value],
       assoc_splat:                [:operator_loc, :value],
@@ -52,14 +52,14 @@ module Steadfast
       local_variable_target:      :emit_verbatim,
       local_variable_write:       [:name_loc, :operator_loc, :value],
       match_predicate:            [:value, :whitespace, :operator_loc, :whitespace, :pattern],
-      match_required:             [:value, :operator_loc, :pattern],
+      match_required:             [:value, :whitespace, :operator_loc, :whitespace, :pattern],
       match_write:                [:call],
-      next:                       [:keyword_loc, :arguments],
+      next:                       [:keyword_loc, :whitespace, :arguments],
       nil:                        :emit_verbatim,
       no_keywords_parameter:      :emit_verbatim,
       numbered_parameters:        :emit_nothing,
-      optional_parameter:         [:name_loc, :operator_loc, :value],
-      optional_keyword_parameter: [:name_loc, :value],
+      optional_parameter:         [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      optional_keyword_parameter: [:name_loc, :whitespace, :value],
       or:                         [:left, :whitespace, :operator_loc, :whitespace, :right],
       parentheses:                [:opening_loc, :body, :closing_loc],
       pinned_expression:          [:operator_loc, :lparen_loc, :expression, :rparen_loc],
@@ -78,7 +78,6 @@ module Steadfast
       source_file:                :emit_verbatim,
       source_line:                :emit_verbatim,
       splat:                      [:operator_loc, :expression],
-      string:                     [:opening_loc, :content_loc, :closing_loc],
       symbol:                     :emit_verbatim,
       true:                       :emit_verbatim,
       x_string:                   :emit_verbatim,
@@ -105,6 +104,7 @@ module Steadfast
     def visit_lambda_node(node)
       emit_code(node.operator_loc)
       emit_code(node.parameters)
+      emit_whitespace
       emit_code(node.opening_loc)
       emit_newline
       emit_code(node.body)#, semicolon: node.opening_loc.slice == 'do')
@@ -190,6 +190,7 @@ module Steadfast
       if (ml = node.message_loc)
         ol = node.opening_loc
         emit_message_loc = !ol || (ol.start_line != ml.start_line) || (ol.start_column != ml.start_column)
+        emit_whitespace if node.name =~ /^\+|\-|\*|\/|\&|\|\*\*|\&\&|\|\||\%$/
         emit_code(node.message_loc) if emit_message_loc
       end
       emit_code(node.opening_loc)
@@ -203,6 +204,7 @@ module Steadfast
         block = nil
       end
       emit_code(node.closing_loc)
+      emit_semicolon if !node.opening_loc && node.arguments && node.arguments.arguments.size == 1 && node.arguments.arguments[0].is_a?(Ruby::Prism::SplatNode) && !block
       emit_whitespace if block
       emit_code(block)
     end
@@ -235,9 +237,13 @@ module Steadfast
 
     def visit_rescue_node(node)
       emit_code(node.keyword_loc)#, semicolon: true)
+      emit_whitespace
       visit_comma_separated_nodes(node.exceptions)
+      emit_whitespace
       emit_code(node.operator_loc)
+      emit_whitespace
       emit_code(node.reference)
+      emit_newline
       emit_code(node.statements)#, semicolon: true)
       emit_newline
       emit_code(node.subsequent)
@@ -374,14 +380,14 @@ module Steadfast
       emit_code(node.receiver)
       emit_code(node.operator_loc)
       emit_code(node.name_loc)
-      emit_whitespace
-
+      emit_whitespace if !node.lparen_loc
       emit_code(node.lparen_loc)
       if node.parameters
         emit_code(node.parameters)
       end
       emit_code(node.rparen_loc)
       emit_code(node.equal_loc)
+      emit_newline
       emit_code(node.body)#, semicolon: !node.equal_loc)
       emit_newline
       emit_code(node.end_keyword_loc)#, semicolon: true)
@@ -433,7 +439,7 @@ module Steadfast
       emit_code(node.keyword_loc)
       emit_whitespace
       emit_code(node.predicate)
-      emit_whitespace
+      emit_newline
       emit_code(node.statements)
       emit_newline
       emit_code(node.closing_loc)
@@ -505,8 +511,18 @@ module Steadfast
     end
 
     def visit_interpolated_symbol_node(node)
+      heredoc = node.opening_loc && node.opening_loc.slice =~ /\<\</
       emit_code(node.opening_loc)
-      node.parts.each { |p| emit_code(p) }
+      emit_newline if heredoc
+      last_part = nil
+      node.parts.each { |p|
+        if heredoc && last_part && p.location.start_line != last_part.location.start_line
+          emit_newline
+        end
+        emit_code(p)
+        last_part = p
+      }
+      emit_newline if heredoc
       emit_code(node.closing_loc)
     end
     alias_method :visit_interpolated_string_node, :visit_interpolated_symbol_node
@@ -578,7 +594,100 @@ module Steadfast
       emit_whitespace if node.right.is_a?(Ruby::Prism::RangeNode)
       emit_code(node.right)
     end
-  
+
+    def visit_class_node(node)
+      emit_code(node.class_keyword_loc)
+      emit_whitespace
+      emit_code(node.constant_path)
+      emit_whitespace
+      emit_code(node.inheritance_operator_loc)
+      emit_whitespace
+      emit_code(node.superclass)
+      emit_newline
+      emit_code(node.body)
+      emit_newline
+      emit_code(node.end_keyword_loc)
+    end
+    
+    def visit_interpolated_regular_expression_node(node)
+      emit_code(node.opening_loc)
+      node.parts.each { |p| emit_code(p) }
+      emit_code(node.closing_loc)
+    end
+
+    def visit_call_node_attribute_write(node)
+      emit_code(node.receiver)
+      if node.call_operator_loc
+        emit_code(node.call_operator_loc)
+        emit_code(node.message_loc)
+      end
+      emit_code(node.opening_loc)
+      comma = visit_arguments_node(node.arguments, 0..-2)
+      if node.block
+        emit_comma if comma
+        emit_code(node.block)
+      end
+      emit_code(node.closing_loc)
+      emit(" = ")
+      emit_code(node.arguments.arguments[-1])
+      return
+    end
+
+    def visit_string_node(node)
+      heredoc = node.opening_loc && node.opening_loc.slice =~ /\<\</
+      emit_code(node.opening_loc)
+      emit_newline if heredoc
+      emit_code(node.content_loc)
+      emit_newline if heredoc
+      emit_code(node.closing_loc)
+    end
+
+    def visit_call_target_node(node)
+      emit_code(node.receiver)
+      emit_code(node.call_operator_loc)
+      emit_code(node.message_loc)
+    end
+      
+    def visit_singleton_class_node(node)
+      emit_code(node.class_keyword_loc)
+      emit_whitespace
+      emit_code(node.operator_loc)
+      emit_whitespace
+      emit_code(node.expression)
+      emit_newline
+      emit_code(node.body)
+      emit_newline
+      emit_code(node.end_keyword_loc)
+    end
+
+    def visit_for_node(node)
+      emit_code(node.for_keyword_loc)
+      emit_whitespace
+      emit_code(node.index)
+      emit_whitespace
+      emit_code(node.in_keyword_loc)
+      emit_whitespace
+      emit_code(node.collection)
+      emit_whitespace
+      emit_code(node.do_keyword_loc)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
+      emit_code(node.end_keyword_loc)
+    end
+
+    def visit_undef_node(node)
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      visit_comma_separated_nodes(node.names)
+    end
+
+    def visit_interpolated_x_string_node(node)
+      emit_code(node.opening_loc)
+      node.parts.each { |p| emit_code(p) }
+      emit_code(node.closing_loc)
+    end
+
     private
 
     def visit_plan(plan, node)
@@ -650,7 +759,7 @@ module Steadfast
     end
 
     def emit_newline
-      @buffer << "\n"
+      @buffer << "\n" if @buffer[-1] != "\n"
     end
 
     def emit_whitespace

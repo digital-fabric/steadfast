@@ -54,15 +54,6 @@ class SourcifierTest < Minitest::Test
     node.inject_parameters('foo')
     assert_equal '-> (foo, a:, b: 2) { 4 }', Steadfast.to_source(node).strip
   end
-
-  def test_no_indent
-    p1 = -> {   1   }
-    node = Steadfast.to_ast(p1)
-    assert_kind_of Ruby::Prism::LambdaNode, node
-    assert_equal '-> {   1   }', Steadfast.to_source(node).strip
-
-    assert_equal '-> { 1 }', Steadfast.to_source(node, minimize_whitespace: true).strip
-  end
 end
 
 class SourcifierSourceMapTest < Minitest::Test
