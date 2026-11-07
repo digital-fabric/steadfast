@@ -18,7 +18,7 @@ module Minitest::Assertions
   def assert_source_match exp, act
     exp = format_src(exp)
     act = format_src(act)
-    
+
     msg = message(msg) { "Expected: \n\n #{mu_pp(act)} \n\n to equal: \n\n #{mu_pp(exp)}" }
     assert_equal exp, act, msg
   end

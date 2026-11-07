@@ -24,7 +24,7 @@ class SourcifierTest < Minitest::Test
 
   def test_proc_parameter_injection
     skip
-    
+
     p1 = -> { 1 }
     node = Steadfast.to_ast(p1)
     assert_kind_of Ruby::Prism::LambdaNode, node

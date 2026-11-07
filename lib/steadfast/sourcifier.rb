@@ -114,7 +114,7 @@ module Steadfast
     VISIT_PLANS.each do |key, plan|
       sym = :"visit_#{key}_node"
       define_method(sym) { |n| visit_plan(plan, n) }
-    end  
+    end
 
     def visit_array_node(node)
       emit_code(node.opening_loc)
@@ -649,5 +649,4 @@ module Steadfast
     def emit_nothing(node)
     end
   end
-  
 end
