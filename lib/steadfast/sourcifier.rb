@@ -12,7 +12,11 @@ module Steadfast
       block_local_variable:       :emit_verbatim,
       block_parameter:            [:operator_loc, :name_loc],
       break:                      [:keyword_loc, :whitespace, :arguments],
+      call_target:                [:receiver, :call_operator_loc, :message_loc],
       capture_pattern:            [:value, :whitespace, :operator_loc, :whitespace, :target],
+      class:                      [:class_keyword_loc, :whitespace, :constant_path, :whitespace,
+                                   :inheritance_operator_loc, :whitespace, :superclass, :newline,
+                                   :body, :newline, :end_keyword_loc],
       class_variable_read:        :emit_verbatim,
       class_variable_target:      :emit_verbatim,
       class_variable_write:       [:name_loc, :operator_loc, :value],
@@ -21,11 +25,16 @@ module Steadfast
       constant_read:              :emit_verbatim,
       constant_write:             [:name_loc, :operator_loc, :value],
       defined:                    [:keyword_loc, :lparen_loc, :value, :rparen_loc],
+      else:                       [:else_keyword_loc, :newline, :statements],
       embedded_statements:        [:opening_loc, :statements, :closing_loc],
       embedded_variable:          [:operator_loc, :variable],
+      ensure:                     [:ensure_keyword_loc, :newline, :statements],
       false:                      :emit_verbatim,
       flip_flop:                  [:left, :operator_loc, :right],
       float:                      :emit_verbatim,
+      for:                        [:for_keyword_loc, :whitespace, :index, :whitespace, :in_keyword_loc,
+                                   :whitespace, :collection, :whitespace, :do_keyword_loc, :newline,
+                                   :statements, :newline, :end_keyword_loc],
       forwarding_arguments:       :emit_verbatim,
       forwarding_parameter:       :emit_verbatim,
       forwarding_super:           :emit_verbatim,
@@ -37,6 +46,8 @@ module Steadfast
       implicit_rest:              :emit_nothing,
       in:                         [:in_loc, :whitespace, :pattern, :whitespace, :then_loc],
       index_target:               [:receiver, :opening_loc, :arguments, :closing_loc],
+      instance_variable_operator_write: [:name_loc, :whitespace, :binary_operator_loc, :whitespace, :value],
+      instance_variable_or_write: [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
       instance_variable_read:     :emit_verbatim,
       instance_variable_target:   :emit_verbatim,
       instance_variable_write:    [:name_loc, :operator_loc, :value],
@@ -45,6 +56,7 @@ module Steadfast
       it_local_variable_read:     :emit_verbatim,
       keyword_rest_parameter:     [:operator_loc, :name_loc],
       keyword_parameter:          :emit_verbatim,
+      lambda:                     [:operator_loc, :parameters, :whitespace, :opening_loc, :newline, :body, :newline, :closing_loc],
       local_variable_and_write:   [:name_loc, :operator_loc, :value],
       local_variable_operator_write: [:name_loc, :binary_operator_loc, :value],
       local_variable_or_write:    [:name_loc, :operator_loc, :value],
@@ -54,6 +66,7 @@ module Steadfast
       match_predicate:            [:value, :whitespace, :operator_loc, :whitespace, :pattern],
       match_required:             [:value, :whitespace, :operator_loc, :whitespace, :pattern],
       match_write:                [:call],
+      module:                     [:module_keyword_loc, :whitespace, :constant_path, :newline, :body, :newline, :end_keyword_loc],
       next:                       [:keyword_loc, :whitespace, :arguments],
       nil:                        :emit_verbatim,
       no_keywords_parameter:      :emit_verbatim,
@@ -74,6 +87,8 @@ module Steadfast
       retry:                      :emit_verbatim,
       return:                     [:keyword_loc, :whitespace, :arguments],
       self:                       :emit_verbatim,
+      singleton_class:            [:class_keyword_loc, :whitespace, :operator_loc, :whitespace, :expression,
+                                   :newline, :body, :newline, :end_keyword_loc],
       source_encoding:            :emit_verbatim,
       source_file:                :emit_verbatim,
       source_line:                :emit_verbatim,
@@ -101,87 +116,62 @@ module Steadfast
       define_method(sym) { |n| visit_plan(plan, n) }
     end  
 
-    def visit_lambda_node(node)
-      emit_code(node.operator_loc)
-      emit_code(node.parameters)
-      emit_whitespace
+    def visit_array_node(node)
       emit_code(node.opening_loc)
+      if node.opening_loc && node.opening_loc.slice =~ /^%/
+        visit_space_separated_nodes(node.elements)
+      else
+        visit_comma_separated_nodes(node.elements)
+      end
+      emit_code(node.closing_loc)
+    end
+
+    def visit_array_pattern_node(node)
+      emit_code(node.constant)
+      emit_code(node.opening_loc)
+      comma = visit_comma_separated_nodes(node.requireds, comma)
+      if node.rest
+        emit_comma if comma
+        emit_code(node.rest)
+        comma = true
+      end
+      visit_comma_separated_nodes(node.posts, comma)
+      emit_code(node.closing_loc)
+    end
+
+    def visit_arguments_node(node, subscript = 0..-1)
+      visit_comma_separated_nodes(node.arguments[subscript])
+    end
+
+    def visit_begin_node(node)
+      emit_code(node.begin_keyword_loc)
       emit_newline
-      emit_code(node.body)#, semicolon: node.opening_loc.slice == 'do')
-      # node.after_body_proc&.(node)
+      emit_code(node.statements)
       emit_newline
-      emit_code(node.closing_loc)#, semicolon: node.closing_loc.slice == 'end')
+      emit_code(node.rescue_clause)
+      emit_newline
+      emit_code(node.else_clause)
+      emit_newline
+      emit_code(node.ensure_clause)
+      emit_newline
+      emit_code(node.end_keyword_loc) if node.begin_keyword_loc
     end
 
     def visit_block_parameters_node(node)
       emit_code(node.opening_loc)
-      # emit_code(node.injected_parameters)
       emit_code(node.parameters)
       emit_semicolon if node.locals && node.locals.size > 0
       visit_comma_separated_nodes(node.locals)
       emit_code(node.closing_loc)
     end
 
-    def visit_parameters_node(node)
-      comma = false
-      # injected_prefix is a custom attribute added by Sirop to the
-      # ParametersNode class (in lib/sirop/prism_ext.rb). It is used
-      # as a way to add a first parameter to a block or method.
-      # if node.injected_prefix
-      #   emit_code(node.injected_prefix)
-      #   # adjust last_loc_end for proper whitespace after comma
-      #   @last_loc_end[1] -= 2 if @last_loc_end
-      #   # binding.irb
-      #   comma = true
-      # end
-
-      comma = visit_comma_separated_nodes(node.requireds, comma)
-      comma = visit_comma_separated_nodes(node.optionals, comma)
-      if node.rest
-        emit_comma if comma
-        emit_code(node.rest)
-        comma = true
-      end
-      comma = visit_comma_separated_nodes(node.posts, comma)
-      comma = visit_comma_separated_nodes(node.keywords, comma)
-      # if node.rest
-      #   emit_comma if comma
-      #   comma = true
-      #   emit_code(node.rest)
-      # end
-      if node.keyword_rest
-        emit_comma if comma
-        comma = true
-        emit_code(node.keyword_rest)
-      end
-      if node.block
-        emit_comma if comma
-        comma = true
-        emit_code(node.block)
-      end
-    end
-
-    def visit_statements_node(node)
-      first = true
-      node.body&.each do |n|
-        emit_newline if !first
-        visit(n)
-        first = false
-      end
-    end
-
     def visit_call_node(node)
-      if node.receiver && !node.call_operator_loc && !node.arguments && node.name != :[]
+      if (node.receiver && !node.call_operator_loc && !node.arguments && node.name != :[]) ||
+         (node.receiver && !node.call_operator_loc && node.name == :!)
         return visit_call_node_unary_op(node)
       end
 
-      if node.receiver && !node.call_operator_loc && node.name == :!
-        return visit_call_node_unary_op(node)
-      end
-
-      if node.attribute_write?
-        return visit_call_node_attribute_write(node)
-      end
+      return visit_call_node_attribute_write(node) if node.attribute_write?
 
       block = node.block
 
@@ -209,268 +199,22 @@ module Steadfast
       emit_code(block)
     end
 
-    def visit_arguments_node(node, subscript = 0..-1)
-      visit_comma_separated_nodes(node.arguments[subscript])
-    end
-
-    def visit_begin_node(node)
-      emit_code(node.begin_keyword_loc) #, semicolon: true)
-      emit_newline
-      emit_code(node.statements)#, semicolon: true)
-      emit_newline
-      emit_code(node.rescue_clause)
-      emit_newline
-      emit_code(node.else_clause)
-      emit_newline
-      emit_code(node.ensure_clause)
-      emit_newline
-      emit_code(node.end_keyword_loc) if node.begin_keyword_loc#, semicolon: true) if node.begin_keyword_loc
-    end
-
-    def visit_ensure_node(node)
-      emit_code(node.ensure_keyword_loc)#, semicolon: true)
-      emit_newline
-      emit_code(node.statements)#, semicolon: true)
-      # emit_newline
-      # emit_code(node.end_keyword_loc)#, semicolon: true)
-    end
-
-    def visit_rescue_node(node)
-      emit_code(node.keyword_loc)#, semicolon: true)
-      emit_whitespace
-      visit_comma_separated_nodes(node.exceptions)
-      emit_whitespace
-      emit_code(node.operator_loc)
-      emit_whitespace
-      emit_code(node.reference)
-      emit_newline
-      emit_code(node.statements)#, semicolon: true)
-      emit_newline
-      emit_code(node.subsequent)
-    end
-
-    def visit_else_node(node)
-      emit_code(node.else_keyword_loc)#, semicolon: node.else_keyword_loc.slice == 'else')
-      emit_newline
-      emit_code(node.statements)#, semicolon: node.else_keyword_loc.slice == 'else')
-    end
-
-    def visit_multi_target_node(node)
-      emit_code(node.lparen_loc)
-      comma = visit_comma_separated_nodes(node.lefts)
-      if node.rest
-        emit_comma if comma
-        emit_code(node.rest)
-        comma = true
-      end
-      visit_comma_separated_nodes(node.rights, comma)
-      emit_code(node.rparen_loc)
-    end
-
-    def visit_array_node(node)
-      emit_code(node.opening_loc)
-      if node.opening_loc && node.opening_loc.slice =~ /^%/
-        visit_space_separated_nodes(node.elements)
-      else
-        visit_comma_separated_nodes(node.elements)
-      end
-      emit_code(node.closing_loc)
-    end
-
-    def visit_array_pattern_node(node)
-      emit_code(node.constant)
-      emit_code(node.opening_loc)
-      comma = visit_comma_separated_nodes(node.requireds, comma)
-      if node.rest
-        emit_comma if comma
-        emit_code(node.rest)
-        comma = true
-      end
-      visit_comma_separated_nodes(node.posts, comma)
-      emit_code(node.closing_loc)
-    end
-
-    def visit_find_pattern_node(node)
-      emit_code(node.constant)
-      emit_code(node.opening_loc)
-      emit_code(node.left)
-      comma = node.left
-      comma = visit_comma_separated_nodes(node.requireds, comma)
-      if node.right
-        emit_comma if comma
-        emit_code(node.right)
-      end
-      emit_code(node.closing_loc)
-    end
-
-    def visit_case_match_node(node)
-      emit_code(node.case_keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-      emit_newline
-      visit_comma_separated_nodes(node.conditions)
-      emit_newline
-      emit_code(node.end_keyword_loc)
-    end
-
-    def visit_if_node(node)
-      if !node.if_keyword_loc
-        return visit_if_node_ternary(node)
-      elsif !node.end_keyword_loc
-        return visit_if_node_guard(node)
-      end
-
-      emit_code(node.if_keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-      emit_newline
-      emit_code(node.then_keyword_loc)
-      emit_newline
-      emit_code(node.statements)#, semicolon: true)
-      emit_newline
-      emit_code(node.subsequent) if node.subsequent
-      emit_newline
-      emit_code(node.end_keyword_loc) if node.if_keyword_loc.slice == 'if' #, semicolon: true) if node.if_keyword_loc.slice == 'if'
-    end
-
-    def visit_if_node_ternary(node)
-      emit_code(node.predicate)
-      emit_whitespace
-      emit_code(node.then_keyword_loc)
-      emit_newline
-      emit_code(node.statements)
-      emit_newline
-      emit_code(node.subsequent)
-    end
-
-    def visit_if_node_guard(node)
-      emit_code(node.statements)
-      emit_whitespace
-      emit_code(node.if_keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-    end
-
-    def visit_hash_pattern_node(node)
-      emit_code(node.constant)
-      emit_code(node.opening_loc)
-      visit_comma_separated_nodes(node.elements)
-      emit_code(node.closing_loc)
-    end
-
-    def visit_multi_write_node(node)
-      emit_code(node.lparen_loc)
-      comma = visit_comma_separated_nodes(node.lefts)
-      if node.rest
-        emit_comma if comma
-        emit_code(node.rest)
-        comma = true
-      end
-      visit_comma_separated_nodes(node.rights, comma)
-      emit_code(node.rparen_loc)
-      emit_whitespace
-      emit_code(node.operator_loc)
-      emit_whitespace
-      emit_code(node.value)
-    end
-
-    def visit_def_node(node)
-      emit_code(node.def_keyword_loc)#, semicolon: true)
-      emit_whitespace
+    def visit_call_node_attribute_write(node)
       emit_code(node.receiver)
-      emit_code(node.operator_loc)
-      emit_code(node.name_loc)
-      emit_whitespace if !node.lparen_loc
-      emit_code(node.lparen_loc)
-      if node.parameters
-        emit_code(node.parameters)
+      if node.call_operator_loc
+        emit_code(node.call_operator_loc)
+        emit_code(node.message_loc)
       end
-      emit_code(node.rparen_loc)
-      emit_code(node.equal_loc)
-      emit_newline
-      emit_code(node.body)#, semicolon: !node.equal_loc)
-      emit_newline
-      emit_code(node.end_keyword_loc)#, semicolon: true)
-      # @semicolon = true
-    end
-
-    def visit_super_node(node)
-      emit_code(node.keyword_loc)
-      emit_code(node.lparen_loc)
-      emit_whitespace if !node.lparen_loc
-      emit_code(node.arguments)
-      emit_block_pre_rparen = node.block.is_a?(Ruby::Prism::BlockArgumentNode)
-      if emit_block_pre_rparen
-        emit_comma if node.arguments
+      emit_code(node.opening_loc)
+      comma = visit_arguments_node(node.arguments, 0..-2)
+      if node.block
+        emit_comma if comma
         emit_code(node.block)
       end
-      emit_code(node.rparen_loc)
-      emit_code(node.block) if !emit_block_pre_rparen
-    end
-
-    def visit_unless_node(node)
-      if !node.end_keyword_loc
-        return visit_unless_node_guard(node)
-      end
-
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-      emit_code(node.then_keyword_loc)
-      emit_newline
-      emit_code(node.statements)
-      emit_newline
-      emit_code(node.else_clause) if node.else_clause
-      emit_newline
-      emit_code(node.end_keyword_loc) if node.keyword_loc.slice == 'unless'
-    end
-
-    def visit_unless_node_guard(node)
-      emit_code(node.statements)
-      emit_whitespace
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-    end
-
-    def visit_while_node(node)
-      return visit_while_node_guard(node) if !node.closing_loc
-
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-      emit_newline
-      emit_code(node.statements)
-      emit_newline
       emit_code(node.closing_loc)
-    end
-
-    def visit_while_node_guard(node)
-      emit_code(node.statements)
-      emit_whitespace
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-    end
-
-    def visit_until_node(node)
-      return visit_until_node_guard(node) if !node.closing_loc
-
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
-      emit_newline
-      emit_code(node.statements)
-      emit_newline
-      emit_code(node.closing_loc)
-    end
-
-    def visit_until_node_guard(node)
-      emit_code(node.statements)
-      emit_whitespace
-      emit_code(node.keyword_loc)
-      emit_whitespace
-      emit_code(node.predicate)
+      emit(" = ")
+      emit_code(node.arguments.arguments[-1])
+      return
     end
 
     def visit_call_node_unary_op(node)
@@ -492,22 +236,92 @@ module Steadfast
       emit_code(node.end_keyword_loc)
     end
 
-    def visit_when_node(node)
-      emit_code(node.keyword_loc)
+    def visit_case_match_node(node)
+      emit_code(node.case_keyword_loc)
       emit_whitespace
+      emit_code(node.predicate)
+      emit_newline
       visit_comma_separated_nodes(node.conditions)
       emit_newline
-      emit_code(node.statements)
+      emit_code(node.end_keyword_loc)
     end
 
-    def visit_module_node(node)
-      emit_code(node.module_keyword_loc)
+    def visit_def_node(node)
+      emit_code(node.def_keyword_loc)
       emit_whitespace
-      emit_code(node.constant_path)
+      emit_code(node.receiver)
+      emit_code(node.operator_loc)
+      emit_code(node.name_loc)
+      emit_whitespace if !node.lparen_loc
+      emit_code(node.lparen_loc)
+      emit_code(node.parameters)
+      emit_code(node.rparen_loc)
+      emit_code(node.equal_loc)
       emit_newline
       emit_code(node.body)
       emit_newline
       emit_code(node.end_keyword_loc)
+    end
+
+    def visit_find_pattern_node(node)
+      emit_code(node.constant)
+      emit_code(node.opening_loc)
+      emit_code(node.left)
+      comma = node.left
+      comma = visit_comma_separated_nodes(node.requireds, comma)
+      if node.right
+        emit_comma if comma
+        emit_code(node.right)
+      end
+      emit_code(node.closing_loc)
+    end
+
+    def visit_hash_node(node)
+      emit_code(node.opening_loc)
+      visit_comma_separated_nodes(node.elements)
+      emit_code(node.closing_loc)
+    end
+
+    def visit_hash_pattern_node(node)
+      emit_code(node.constant)
+      emit_code(node.opening_loc)
+      visit_comma_separated_nodes(node.elements)
+      emit_code(node.closing_loc)
+    end
+
+    def visit_if_node(node)
+      return visit_if_node_ternary(node) if !node.if_keyword_loc
+      return visit_if_node_guard(node) if !node.end_keyword_loc
+
+      emit_code(node.if_keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+      emit_newline
+      emit_code(node.then_keyword_loc)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
+      emit_code(node.subsequent) if node.subsequent
+      emit_newline
+      emit_code(node.end_keyword_loc) if node.if_keyword_loc.slice == 'if'
+    end
+
+    def visit_if_node_guard(node)
+      emit_code(node.statements)
+      emit_whitespace
+      emit_code(node.if_keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+    end
+
+    def visit_if_node_ternary(node)
+      emit_code(node.predicate)
+      emit_whitespace
+      emit_code(node.then_keyword_loc)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
+      emit_code(node.subsequent)
     end
 
     def visit_interpolated_symbol_node(node)
@@ -526,32 +340,6 @@ module Steadfast
       emit_code(node.closing_loc)
     end
     alias_method :visit_interpolated_string_node, :visit_interpolated_symbol_node
-
-    def visit_keyword_hash_node(node)
-      visit_comma_separated_nodes(node.elements)
-    end
-
-    def visit_hash_node(node)
-      emit_code(node.opening_loc)
-      visit_comma_separated_nodes(node.elements)
-      emit_code(node.closing_loc)
-    end
-
-    def visit_instance_variable_or_write_node(node)
-      emit_code(node.name_loc)
-      emit_whitespace
-      emit_code(node.operator_loc)
-      emit_whitespace
-      emit_code(node.value)
-    end
-
-    def visit_instance_variable_operator_write_node(node)
-      emit_code(node.name_loc)
-      emit_whitespace
-      emit_code(node.binary_operator_loc)
-      emit_whitespace
-      emit_code(node.value)
-    end
 
     def visit_index_operator_write_node(node)
       emit_code(node.receiver)
@@ -588,6 +376,75 @@ module Steadfast
     end
     alias_method :visit_index_and_write_node, :visit_index_or_write_node
 
+    def visit_interpolated_regular_expression_node(node)
+      emit_code(node.opening_loc)
+      node.parts.each { |p| emit_code(p) }
+      emit_code(node.closing_loc)
+    end
+
+    def visit_interpolated_x_string_node(node)
+      emit_code(node.opening_loc)
+      node.parts.each { |p| emit_code(p) }
+      emit_code(node.closing_loc)
+    end
+
+    def visit_keyword_hash_node(node)
+      visit_comma_separated_nodes(node.elements)
+    end
+
+    def visit_multi_target_node(node)
+      emit_code(node.lparen_loc)
+      comma = visit_comma_separated_nodes(node.lefts)
+      if node.rest
+        emit_comma if comma
+        emit_code(node.rest)
+        comma = true
+      end
+      visit_comma_separated_nodes(node.rights, comma)
+      emit_code(node.rparen_loc)
+    end
+
+    def visit_multi_write_node(node)
+      emit_code(node.lparen_loc)
+      comma = visit_comma_separated_nodes(node.lefts)
+      if node.rest
+        emit_comma if comma
+        emit_code(node.rest)
+        comma = true
+      end
+      visit_comma_separated_nodes(node.rights, comma)
+      emit_code(node.rparen_loc)
+      emit_whitespace
+      emit_code(node.operator_loc)
+      emit_whitespace
+      emit_code(node.value)
+    end
+
+    def visit_parameters_node(node)
+      comma = false
+      comma = visit_comma_separated_nodes(node.requireds, comma)
+      comma = visit_comma_separated_nodes(node.optionals, comma)
+      if node.rest
+        emit_comma if comma
+        emit_code(node.rest)
+        comma = true
+      end
+
+      comma = visit_comma_separated_nodes(node.posts, comma)
+      comma = visit_comma_separated_nodes(node.keywords, comma)
+
+      if node.keyword_rest
+        emit_comma if comma
+        comma = true
+        emit_code(node.keyword_rest)
+      end
+      if node.block
+        emit_comma if comma
+        comma = true
+        emit_code(node.block)
+      end
+    end
+
     def visit_range_node(node)
       emit_code(node.left)
       emit_code(node.operator_loc)
@@ -595,42 +452,27 @@ module Steadfast
       emit_code(node.right)
     end
 
-    def visit_class_node(node)
-      emit_code(node.class_keyword_loc)
+    def visit_rescue_node(node)
+      emit_code(node.keyword_loc)
       emit_whitespace
-      emit_code(node.constant_path)
+      visit_comma_separated_nodes(node.exceptions)
       emit_whitespace
-      emit_code(node.inheritance_operator_loc)
+      emit_code(node.operator_loc)
       emit_whitespace
-      emit_code(node.superclass)
+      emit_code(node.reference)
       emit_newline
-      emit_code(node.body)
+      emit_code(node.statements)
       emit_newline
-      emit_code(node.end_keyword_loc)
-    end
-    
-    def visit_interpolated_regular_expression_node(node)
-      emit_code(node.opening_loc)
-      node.parts.each { |p| emit_code(p) }
-      emit_code(node.closing_loc)
+      emit_code(node.subsequent)
     end
 
-    def visit_call_node_attribute_write(node)
-      emit_code(node.receiver)
-      if node.call_operator_loc
-        emit_code(node.call_operator_loc)
-        emit_code(node.message_loc)
+    def visit_statements_node(node)
+      first = true
+      node.body&.each do |n|
+        emit_newline if !first
+        visit(n)
+        first = false
       end
-      emit_code(node.opening_loc)
-      comma = visit_arguments_node(node.arguments, 0..-2)
-      if node.block
-        emit_comma if comma
-        emit_code(node.block)
-      end
-      emit_code(node.closing_loc)
-      emit(" = ")
-      emit_code(node.arguments.arguments[-1])
-      return
     end
 
     def visit_string_node(node)
@@ -642,38 +484,18 @@ module Steadfast
       emit_code(node.closing_loc)
     end
 
-    def visit_call_target_node(node)
-      emit_code(node.receiver)
-      emit_code(node.call_operator_loc)
-      emit_code(node.message_loc)
-    end
-      
-    def visit_singleton_class_node(node)
-      emit_code(node.class_keyword_loc)
-      emit_whitespace
-      emit_code(node.operator_loc)
-      emit_whitespace
-      emit_code(node.expression)
-      emit_newline
-      emit_code(node.body)
-      emit_newline
-      emit_code(node.end_keyword_loc)
-    end
-
-    def visit_for_node(node)
-      emit_code(node.for_keyword_loc)
-      emit_whitespace
-      emit_code(node.index)
-      emit_whitespace
-      emit_code(node.in_keyword_loc)
-      emit_whitespace
-      emit_code(node.collection)
-      emit_whitespace
-      emit_code(node.do_keyword_loc)
-      emit_newline
-      emit_code(node.statements)
-      emit_newline
-      emit_code(node.end_keyword_loc)
+    def visit_super_node(node)
+      emit_code(node.keyword_loc)
+      emit_code(node.lparen_loc)
+      emit_whitespace if !node.lparen_loc
+      emit_code(node.arguments)
+      emit_block_pre_rparen = node.block.is_a?(Ruby::Prism::BlockArgumentNode)
+      if emit_block_pre_rparen
+        emit_comma if node.arguments
+        emit_code(node.block)
+      end
+      emit_code(node.rparen_loc)
+      emit_code(node.block) if !emit_block_pre_rparen
     end
 
     def visit_undef_node(node)
@@ -682,10 +504,75 @@ module Steadfast
       visit_comma_separated_nodes(node.names)
     end
 
-    def visit_interpolated_x_string_node(node)
-      emit_code(node.opening_loc)
-      node.parts.each { |p| emit_code(p) }
+    def visit_unless_node(node)
+      return visit_unless_node_guard(node) if !node.end_keyword_loc
+
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+      emit_code(node.then_keyword_loc)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
+      emit_code(node.else_clause) if node.else_clause
+      emit_newline
+      emit_code(node.end_keyword_loc) if node.keyword_loc.slice == 'unless'
+    end
+
+    def visit_unless_node_guard(node)
+      emit_code(node.statements)
+      emit_whitespace
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+    end
+
+    def visit_until_node(node)
+      return visit_until_node_guard(node) if !node.closing_loc
+
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
       emit_code(node.closing_loc)
+    end
+
+    def visit_until_node_guard(node)
+      emit_code(node.statements)
+      emit_whitespace
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+    end
+
+    def visit_when_node(node)
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      visit_comma_separated_nodes(node.conditions)
+      emit_newline
+      emit_code(node.statements)
+    end
+
+    def visit_while_node(node)
+      return visit_while_node_guard(node) if !node.closing_loc
+
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
+      emit_newline
+      emit_code(node.statements)
+      emit_newline
+      emit_code(node.closing_loc)
+    end
+
+    def visit_while_node_guard(node)
+      emit_code(node.statements)
+      emit_whitespace
+      emit_code(node.keyword_loc)
+      emit_whitespace
+      emit_code(node.predicate)
     end
 
     private
@@ -734,27 +621,12 @@ module Steadfast
 
     def emit_code(loc)
       return if !loc
-
-#       if @last_loc
-#         loc_loc = loc.is_a?(Ruby::Prism::Node) ? loc.location : loc
-#         return if loc_loc.slice == @last_loc.slice && loc_loc.start_line == @last_loc.start_line &&
-#           loc_loc.start_column == @last_loc.start_column
-#       end
-# 
-#       semicolon ||= @semicolon
-#       @semicolon = false
-#       emit_semicolon(loc) if semicolon
       return visit(loc) if loc.is_a?(Ruby::Prism::Node)
 
-      # adjust_whitespace(loc)
-      # str = loc.slice
-      # str = str.chomp if chomp
-      str = loc.slice.chomp
-      emit(str)
+      emit(loc.slice.chomp)
     end
 
     def emit(str)
-      # update_source_map(str)
       @buffer << str
     end
 
