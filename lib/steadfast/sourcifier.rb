@@ -1,5 +1,16 @@
+# frozen_string_literal: true
+
 module Steadfast
+  # A Sourcifier is used for converting an AST to source code. Sourcifier is
+  # implemented as an AST visitor that walks the AST, copying the relevant
+  # strings from each node into a buffer, with the addition of whitespace,
+  # commas, semicolons and newlines where applicable.
   class Sourcifier < Ruby::Prism::BasicVisitor
+    # The following visit plans are used for generating code for node types that
+    # don't require special logic. For each node, a list of fields/elements to
+    # emit is given. For each node, a visit_xxx_node method is generated from
+    # its visit plan. Nodes requiring special logic have normal visit_xxx_node
+    # method below.
     VISIT_PLANS = {
       alias_global_variable:      [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
       alias_method:               [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
@@ -42,8 +53,8 @@ module Steadfast
       global_variable_target:     :emit_verbatim,
       global_variable_write:      [:name_loc, :operator_loc, :value],
       imaginary:                  :emit_verbatim,
-      implicit:                   :emit_nothing,
-      implicit_rest:              :emit_nothing,
+      implicit:                   :nop,
+      implicit_rest:              :nop,
       in:                         [:in_loc, :whitespace, :pattern, :whitespace, :then_loc],
       index_target:               [:receiver, :opening_loc, :arguments, :closing_loc],
       instance_variable_operator_write: [:name_loc, :whitespace, :binary_operator_loc, :whitespace, :value],
@@ -52,7 +63,7 @@ module Steadfast
       instance_variable_target:   :emit_verbatim,
       instance_variable_write:    [:name_loc, :operator_loc, :value],
       integer:                    :emit_verbatim,
-      it_parameters:              :emit_nothing,
+      it_parameters:              :nop,
       it_local_variable_read:     :emit_verbatim,
       keyword_rest_parameter:     [:operator_loc, :name_loc],
       keyword_parameter:          :emit_verbatim,
@@ -70,7 +81,7 @@ module Steadfast
       next:                       [:keyword_loc, :whitespace, :arguments],
       nil:                        :emit_verbatim,
       no_keywords_parameter:      :emit_verbatim,
-      numbered_parameters:        :emit_nothing,
+      numbered_parameters:        :nop,
       optional_parameter:         [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
       optional_keyword_parameter: [:name_loc, :whitespace, :value],
       or:                         [:left, :whitespace, :operator_loc, :whitespace, :right],
@@ -101,19 +112,25 @@ module Steadfast
 
     attr_reader :buffer
 
+    # Initializes the Sourcifier instance.
+    #
+    # @return [void]
     def initialize(**)
       @buffer = +''
     end
 
-    def to_source(node)
+    # Converts the given AST to source code.
+    #
+    # @param ast [Prism::Node] AST
+    # @return [String] source code
+    def to_source(ast)
       @buffer.clear
-      visit(node)
+      visit(ast)
       @buffer
     end
 
-    VISIT_PLANS.each do |key, plan|
-      sym = :"visit_#{key}_node"
-      define_method(sym) { |n| visit_plan(plan, n) }
+    VISIT_PLANS.each do |kind, plan|
+      define_method(:"visit_#{kind}_node") { |n| visit_node_with_plan(n, plan) }
     end
 
     def visit_array_node(node)
@@ -577,10 +594,15 @@ module Steadfast
 
     private
 
-    def visit_plan(plan, node)
+    # Visits a node with the given visit plan.
+    #
+    # @param node [Prism::Node]
+    # @param plan [Array<Symbol>, Symbol] visit plan
+    # @return [void]
+    def visit_node_with_plan(node, plan)
       return send(plan, node) if plan.is_a?(Symbol)
 
-      plan.each_with_index do |sym, idx|
+      plan.each do |sym|
         case sym
         when :newline
           emit_newline
@@ -593,17 +615,28 @@ module Steadfast
       end
     end
 
+    # Visit an array of nodes, with commas emitted between them. The given comma
+    # flag determines whether to emit a comma before visiting the next node in
+    # the list, and is set to true after visiting a node.
+    #
+    # @param list [Array<Ruby::Prism::Node>, nil] node list or nil
+    # @param comma [bool] comma flag
+    # @return [bool] comma flag
     def visit_comma_separated_nodes(list, comma = false)
-      if list
-        list.each do |child|
-          emit_comma if comma
-          emit_code(child)
-          comma = true
-        end
+      return false if !list
+
+      list.each do |child|
+        emit_comma if comma
+        emit_code(child)
+        comma = true
       end
       comma
     end
 
+    # Visit an array of nodes separated by whitespace.
+    #
+    # @param list [Array<Ruby::Prism::Node>, nil] node list or nil
+    # @return [void]
     def visit_space_separated_nodes(list)
       return if !list
 
@@ -615,10 +648,18 @@ module Steadfast
       end
     end
 
+    # Appends a node's location verbatim into the source code buffer.
+    #
+    # @param node [Ruby::Prism::Node]
+    # @return [void]
     def emit_verbatim(node)
       emit_code(node.location)
     end
 
+    # Appends a code location (or a node) into the source code buffer.
+    #
+    # @param loc [Ruby::Prism::Location, Ruby::Prism::Node, nil]
+    # @return [void]
     def emit_code(loc)
       return if !loc
       return visit(loc) if loc.is_a?(Ruby::Prism::Node)
@@ -626,27 +667,45 @@ module Steadfast
       emit(loc.slice.chomp)
     end
 
+    # Appends the given string into the source code buffer.
+    #
+    # @param str [String]
+    # @return [void]
     def emit(str)
       @buffer << str
     end
 
+    # Appends a newline into the source code buffer.
+    #
+    # @return [void]
     def emit_newline
       @buffer << "\n" if @buffer[-1] != "\n"
     end
 
+    # Appends a space character into the source code buffer.
+    #
+    # @return [void]
     def emit_whitespace
       @buffer << " "
     end
 
+    # Appends a comma into the source code buffer.
+    #
+    # @return [void]
     def emit_comma
       @buffer << ","
     end
 
+    # Appends a semicolon into the source code buffer.
+    #
+    # @return [void]
     def emit_semicolon
       @buffer << ';'
     end
 
-    def emit_nothing(node)
-    end
+    # A nop method for doing nothing.
+    #
+    # @return [void]
+    def nop(node); end
   end
 end

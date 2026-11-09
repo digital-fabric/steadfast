@@ -2,13 +2,22 @@
 
 require 'steadfast/sourcifier'
 
+# Tell Ruby to keep script lines in memory, so calling Proc#syntax_tree or
+# Method#syntax_tree will work.
 RubyVM.keep_script_lines = true
 
+# Steadfast is a metaprogramming gem for Ruby. Steadfast provides a
+# general-purpose mecehanism for generating and rewriting Ruby code at runtime.
 module Steadfast
+  # A base error class for Steadfast errors
   class Error < StandardError
   end
 
   class << self
+    # Returns an AST for the given object.
+    #
+    # @param obj [Proc, Method, UnboundedMethod, Ruby::Prism::Node]
+    # @return [Ruby::Prism::Node]
     def to_ast(obj)
       case obj
       when Proc, Method, UnboundMethod
@@ -20,6 +29,10 @@ module Steadfast
       end
     end
 
+    # Returns the source code to the given object by sourcifying its AST.
+    #
+    # @param obj [Proc, Method, UnboundedMethod, Ruby::Prism::Node]
+    # @return [String]
     def to_source(obj, **)
       obj = to_ast(obj)
       Sourcifier.new(**).to_source(obj)
