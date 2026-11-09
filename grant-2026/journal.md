@@ -124,11 +124,31 @@ end
   - [v] Emit newline whenever detecting a change of source file when sourcifying
     an AST.
 
-In order to test `translate_backtrace`, I implemented a basic `mutate`
-functionality for mutating and putting together ASTs. This code will serve as
-the basis for `Steadfast.mutate`.
+## Remarks
+
+- I decided early on to avoid nicely formatting the generated source code.
+  Instead, the `Sourcifier` implementation inserts a new line basically before
+  each statement, and also before/after keywords such `begin`, `while`, `if`,
+  `rescue` etc. For the tests, I'm using the `syntax_tree` gem to be able to
+  uniformly format the generated code.
+
+- The source generation tests were basically copied over from the Sirop repo.
+  They work by loading the code from the fixture files, `eval` it, acquiring the
+  AST for the code, then sourcifying it, and then comparing it to the original
+  code.
+
+- The source mapping feature is meant to be used for translating exception
+  backtraces. This is just the beginning, so it's not yet clear to me how
+  foolproof this can be. But the tests I wrote show the potential for this.
+
+- In order to test `translate_backtrace`, I implemented a basic `mutate`
+  functionality for composing ASTs into one another (the implementation is in
+  `test/test_sourcifier.rb`). This code will eventually serve as the basis for
+  `Steadfast.mutate`.
 
 ## Next steps
 
 - [ ] Implement `Steadfast.eval_ast(ast, receiver, binding, source_location: nil)`
-- [ ] Implement `Steadfast.mutate`
+- [ ] Blog post by the weekend
+- [ ] Implement `Steadfast.mutate` with lots of tests
+- [ ] Use `Steadfast.mutate` for implementing `Steadfast.eval_ast` with exception backtrace translation
