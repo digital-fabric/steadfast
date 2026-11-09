@@ -59,7 +59,6 @@ end
 
 class SourcifierPrismTest < Minitest::Test
   PRISM_FIXTURES_PATH = File.join(FIXTURES_PATH, 'prism')
-  p path: PRISM_FIXTURES_PATH
 
   Dir["#{PRISM_FIXTURES_PATH}/*.txt"].each do |fn|
     name = File.basename(fn).match(/^(.+)\.txt$/)[1]
@@ -146,8 +145,9 @@ class SourcifierSourceMapTest < Minitest::Test
     raise E3, "E3"
   }
 
+  E4_LINE = __LINE__ + 2
   L4 = ->(x) {
-    [nil, (raise E1, "E1"), foo, bar]
+    x == 2 ? (foo) : (bar)
   }
 
   def mutated_lambda(l)
@@ -197,6 +197,24 @@ class SourcifierSourceMapTest < Minitest::Test
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE, line
+
+    e = catch_error { l.(2) }
+    assert_kind_of E2, e
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    filename, line = bt_entry_location(bt.first)
+    assert_equal __FILE__, filename
+    assert_equal E2_LINE, line
+    
+    e = catch_error { l.(3) }
+    assert_kind_of E3, e
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    filename, line = bt_entry_location(bt.first)
+    assert_equal __FILE__, filename
+    assert_equal E3_LINE, line
+  end
+
+  def test_mutated_single_line_lambda_exception_backtrace
+    l = mutated_lambda(L4)
 
     e = catch_error { l.(2) }
     assert_kind_of E2, e

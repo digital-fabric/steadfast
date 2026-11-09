@@ -678,12 +678,12 @@ module Steadfast
     def record_loc_source_mapping(loc)
       source = loc.send(:source)
       last_source = @last_loc&.send(:source)
-      changed = source != last_source || (@last_loc && (loc.start_line != @last_loc.start_line))
+      different_source = source != last_source
+      changed = different_source || (@last_loc && (loc.start_line != @last_loc.start_line))
       return if !changed
 
+      emit_newline if different_source && last_source
       Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{loc.send(:source).__filename__}:#{loc.start_line}"
-      
-      # p({[@filename, @line] => [loc.send(:source).__filename__, loc.start_line]})
     end
 
     # Appends the given string into the source code buffer.
