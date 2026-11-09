@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Steadfast
+
   # A Sourcifier is used for converting an AST to source code. Sourcifier is
   # implemented as an AST visitor that walks the AST, copying the relevant
   # strings from each node into a buffer, with the addition of whitespace,
@@ -114,17 +115,22 @@ module Steadfast
 
     # Initializes the Sourcifier instance.
     #
+    # @param start_line []
     # @return [void]
-    def initialize(**)
-      @buffer = +''
+    def initialize(source_location: nil, sourcemap: false)
+      @filename, @line = source_location
+      @line ||= 1
+      @sourcemap = sourcemap
+
+      raise Steadfast::Error, "No filename given, can't generate source map" if @sourcemap && !@filename
     end
 
     # Converts the given AST to source code.
     #
-    # @param ast [Prism::Node] AST
+    # @param ast [Ruby::Prism::Node] AST
     # @return [String] source code
     def to_source(ast)
-      @buffer.clear
+      @buffer = +''
       visit(ast)
       @buffer
     end
@@ -596,7 +602,7 @@ module Steadfast
 
     # Visits a node with the given visit plan.
     #
-    # @param node [Prism::Node]
+    # @param node [Ruby::Prism::Node]
     # @param plan [Array<Symbol>, Symbol] visit plan
     # @return [void]
     def visit_node_with_plan(node, plan)
@@ -664,7 +670,20 @@ module Steadfast
       return if !loc
       return visit(loc) if loc.is_a?(Ruby::Prism::Node)
 
+      record_loc_source_mapping(loc) if @sourcemap
       emit(loc.slice.chomp)
+      @last_loc = loc
+    end
+
+    def record_loc_source_mapping(loc)
+      source = loc.send(:source)
+      last_source = @last_loc&.send(:source)
+      changed = source != last_source || (@last_loc && (loc.start_line != @last_loc.start_line))
+      return if !changed
+
+      Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{loc.send(:source).__filename__}:#{loc.start_line}"
+      
+      # p({[@filename, @line] => [loc.send(:source).__filename__, loc.start_line]})
     end
 
     # Appends the given string into the source code buffer.
@@ -673,13 +692,17 @@ module Steadfast
     # @return [void]
     def emit(str)
       @buffer << str
+      @line += str.count("\n")
     end
 
     # Appends a newline into the source code buffer.
     #
     # @return [void]
     def emit_newline
-      @buffer << "\n" if @buffer[-1] != "\n"
+      return if @buffer[-1] == "\n"
+      
+      @buffer << "\n"
+      @line += 1
     end
 
     # Appends a space character into the source code buffer.
