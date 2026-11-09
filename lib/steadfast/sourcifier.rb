@@ -675,6 +675,13 @@ module Steadfast
       @last_loc = loc
     end
 
+    # Adds an entry to the sourcemap hash when detecting a change of line or
+    # filename before emitting an AST location. If a change of filename is
+    # detected, a newline is emitted in order to more accurately be able to
+    # translate backtraces if needed.
+    #
+    # @param loc [Ruby::Prism::Location] code location
+    # @return [void]
     def record_loc_source_mapping(loc)
       source = loc.send(:source)
       last_source = @last_loc&.send(:source)

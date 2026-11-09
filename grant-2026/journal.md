@@ -105,3 +105,30 @@ end
 6. Blog posts
 
 7. Interim report
+
+# 2026-11-09
+
+## Work done
+
+- [v] Set up the Steadfast repo
+- [v] Implement `Steadfast::Sourcifier` (based on code from Sirop, cleaned up
+  and refactored.)
+- [v] Import all Sourcifier tests from Sirop and make them pass
+- [v] Implement source mapping
+  - [v] Keep track of the Proc/Method source location
+
+    We extend `Ruby::Prism::Source` to have a `__filename__` attribute, and set
+    it in `Steadfast.to_ast`.
+
+  - [v] Implement `Steadfast.translate_backtrace` using source mapping.
+  - [v] Emit newline whenever detecting a change of source file when sourcifying
+    an AST.
+
+In order to test `translate_backtrace`, I implemented a basic `mutate`
+functionality for mutating and putting together ASTs. This code will serve as
+the basis for `Steadfast.mutate`.
+
+## Next steps
+
+- [ ] Implement `Steadfast.eval_ast(ast, receiver, binding, source_location: nil)`
+- [ ] Implement `Steadfast.mutate`
