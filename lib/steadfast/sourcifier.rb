@@ -672,7 +672,6 @@ module Steadfast
 
       record_loc_source_mapping(loc) if @sourcemap
       emit(loc.slice.chomp)
-      @last_loc = loc
     end
 
     # Adds an entry to the sourcemap hash when detecting a change of line or
@@ -685,12 +684,17 @@ module Steadfast
     def record_loc_source_mapping(loc)
       source = loc.send(:source)
       last_source = @last_loc&.send(:source)
-      different_source = source != last_source
+      different_source = source.__filename__ && source != last_source
       changed = different_source || (@last_loc && (loc.start_line != @last_loc.start_line))
+      @last_loc = loc if source.__filename__
       return if !changed
 
-      emit_newline if different_source && last_source
-      Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{loc.send(:source).__filename__}:#{loc.start_line}"
+      if (filename = source.__filename__) && (filename || last_source.__filename__)
+        emit_newline if different_source && last_source
+        Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{filename}:#{loc.start_line}"
+      elsif filename.nil? && @last_loc
+        Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{last_source.__filename__}:#{@last_loc.start_line}"
+      end
     end
 
     # Appends the given string into the source code buffer.

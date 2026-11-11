@@ -150,7 +150,7 @@ class SourcifierSourceMapTest < Minitest::Test
     x == 2 ? (foo) : (bar)
   }
 
-  def mutated_lambda(l)
+  def inlined_lambda(l)
     ast1 = Steadfast.to_ast(l)
     ast2 = mutate(ast1) do |n|
       case n
@@ -162,13 +162,13 @@ class SourcifierSourceMapTest < Minitest::Test
         n
       end
     end
-    @source_location = ["(mutated_lambda-#{SecureRandom.hex(4)})", __LINE__ + 1]
+    @source_location = ["(inlined_lambda-#{SecureRandom.hex(4)})", __LINE__ + 1]
     src = Steadfast.to_source(ast2, source_location: @source_location, sourcemap: true)
     eval(src, binding, *@source_location)
   end
 
-  def test_mutated_lambda
-    l = mutated_lambda(L1)
+  def test_sourcemap_inlined_lambda
+    l = inlined_lambda(L1)
     assert_raises(E1) { l.(1) }
     assert_raises(E2) { l.(2) }
     assert_raises(E3) { l.(3) }
@@ -188,8 +188,8 @@ class SourcifierSourceMapTest < Minitest::Test
     end
   end
 
-  def test_mutated_lambda_exception_backtrace
-    l = mutated_lambda(L1)
+  def test_sourcemap_inlined_lambda_exception_backtrace
+    l = inlined_lambda(L1)
 
     e = catch_error { l.(1) }
     assert_kind_of E1, e
@@ -213,8 +213,8 @@ class SourcifierSourceMapTest < Minitest::Test
     assert_equal E3_LINE, line
   end
 
-  def test_mutated_single_line_lambda_exception_backtrace
-    l = mutated_lambda(L4)
+  def test_sourcemap_mutated_single_line_lambda_exception_backtrace
+    l = inlined_lambda(L4)
 
     e = catch_error { l.(2) }
     assert_kind_of E2, e
@@ -229,5 +229,61 @@ class SourcifierSourceMapTest < Minitest::Test
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E3_LINE, line
+  end
+
+  E5_LINE = __LINE__ + 1
+  L5 = -> { raise E2, "E2" }
+
+  E6_LINE = __LINE__ + 2
+  L6 = -> {
+    raise E3, "E3"
+  }
+  def inlined_lambda_without_inlined_filenames(l)
+    ast1 = Steadfast.to_ast(l)
+    ast2 = mutate(ast1) do |n|
+      case n
+      in Ruby::Prism::CallNode(receiver: nil, name: :foo)
+        L5.syntax_tree.body.body[0]
+      in Ruby::Prism::CallNode(receiver: nil, name: :bar)
+        L6.syntax_tree.body.body[0]
+      else
+        n
+      end
+    end
+    @source_location = ["(inlined_lambda-#{SecureRandom.hex(4)})", 1]
+    src = Steadfast.to_source(ast2, source_location: @source_location, sourcemap: true)
+    # DEBUG:
+    # puts
+    # src.lines.each_with_index { |l, i| puts format('%2d %s', i + 1, l) }
+    # puts
+    # pp Steadfast.sourcemap
+    # puts
+    # p l5_filename: L5.syntax_tree.send(:source).__filename__
+    eval(src, binding, *@source_location)
+  end
+
+  def test_sourcemap_inlined_lambda_without_inlined_filenames_exception_backtrace
+    l = inlined_lambda_without_inlined_filenames(L1)
+
+    e = catch_error { l.(1) }
+    assert_kind_of E1, e
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    filename, line = bt_entry_location(bt.first)
+    assert_equal __FILE__, filename
+    assert_equal E1_LINE, line
+
+    e = catch_error { l.(2) }
+    assert_kind_of E2, e
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    filename, line = bt_entry_location(bt.first)
+    assert_equal __FILE__, filename
+    assert_equal E1_LINE + 1, line
+    
+    e = catch_error { l.(3) }
+    assert_kind_of E3, e
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    filename, line = bt_entry_location(bt.first)
+    assert_equal __FILE__, filename
+    assert_equal E1_LINE + 3, line
   end
 end
