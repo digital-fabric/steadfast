@@ -1282,3 +1282,343 @@ quote {
 This could work, but the problem is that § is not available on all keyboards.
 But finally we can use any number of variations on the basic idea of expressing
 those keywords as method calls: `$$.def(...) { ... }`, `!.def(...) { ... }` etc.
+
+# 2026-11-10
+
+## Inlining method / lambda calls
+
+For use in Papercraft, but might be interesting for other uses?
+
+```ruby
+layout = ->(**, &) {
+  html {
+    body {
+      header 'Header'
+      main(**, &)
+    }
+  }
+}
+
+page = Papercraft.render(layout, bar: 42) { |bar:, **|
+  h2 'foo'
+  p "bar: #{bar}"
+}
+```
+
+Which should be expanded to:
+
+```ruby
+->(**__kwargs__, &) {
+  html {
+    body {
+      header 'Header'
+      main {
+        h2 'foo'
+        p "bar: #{__kwargs__[:bar]}"
+      }
+    }
+  }
+}
+```
+
+With mutate, composing the two ASTs is easy. The hard part is coming up with an algorithm to rewrite the argument names:
+
+- Anonymous rest args/kwargs should be rewritten to named rest args/kwargs
+- local var assignments in the inlined AST should also be renamed, such that no value gets accidentally overwritten
+
+How would the API for this look?
+
+```ruby
+Steadfast.inline_ast(layout_ast) { |n|
+  # this block is invoked for each CallNode or a 
+  # anonymous BlockArgumentNode (where expression is nil)
+
+  # the block is expected to either return an AST, which will be inlined (with
+  # arguments and local vars rewritten)
+  # If nil is returned, nothing is inlined
+}
+```
+
+We can also design a separate APIs for getting and rewriting local vars and
+args:
+
+```ruby
+Steadfast.local_vars(ast) #=> returns a list of var names
+
+Steadfast.rewrite_local_vars(ast, **substitutions) #=> returns a mutated AST with substituted var/arg names
+```
+
+## Another example
+
+```ruby
+l1 = ->(a, b) {
+  div {
+    foo(a, b, 42)
+  }
+}
+
+l2 = ->(x, y, z) {
+  p {
+    yy = y + 2
+    bar(x, yy, z + 3)
+  }
+}
+
+Steadfast.inline(l1_ast, foo: l2_ast)
+
+# Which should give us:
+->(a, b) {
+  div {
+    # we make up new arg names, declare them as local vars, assign the callsite
+    # args to them, then compose the inlined AST with the rewritten arg names.
+    __1_x = a
+    __1_y = b
+    __1_z = 42
+    # inlined call - the local var is also renamed
+    __1_yy = __1_y + 2
+    bar(__1_x, __1_yy, __1_z + 3)
+  }
+}
+```
+
+## Nested inlining
+
+If we want to be able to inline recursively - we need to start from the
+innermost level:
+
+```ruby
+layout = ->(**, &) {
+  html { body(**, &) }
+}
+
+content = ->(title:, cards:, **) {
+  h2 title
+  cards.each { |c|
+    card(**c)
+  }
+}
+
+Papercraft.extension[:card] = ->(heading:, text:) {
+  div(class: 'card') {
+    h3 heading
+    p text
+  }
+}
+
+Papercraft.html(layout, info, &content)
+# Which should give us:
+
+->(**__kwargs__) {
+  html {
+    body {
+      # args assignment
+      __1_title = __kwargs__[:title]
+      __1_cards = __kwargs__[:cards]
+      h2 __1_title
+      __1_cards.each { |c|
+        # args assignment
+        __2_heading = c[:heading]
+        __2_text = c[:text]
+        div(class: 'card') {
+          h3 __2_heading
+          p __2_text
+        }
+      }
+    }
+  }
+}
+```
+
+So actually, we should do the inlining from the outside in, since that we can
+track the renaming prefixes more easily:
+
+```ruby
+CN = Ruby::Prism::CallNode
+BAN = Ruby::Prism::BlockArgumentNode
+
+def inline(ast, inline_ctx = {}, &)
+  mutate(ast) { |n|
+    if n in (CN(receiver: nil) | BAN(expression: nil)) && (n2 = yield(n))
+      # recursive inlining:
+      n2 = inline(ast, inline_ctx, &)
+      # return the rewritten inlined ast to the mutator
+      next rewrite_inlined_ast(n2, ctx, &)
+    end
+    n
+  }
+end
+```
+
+## Synthesizing nodes
+
+I already wrote about coming up with a special DSL for expressing keyword
+syntax, e.g. `__.rescue` etc. In order to synthesize those nodes, we can employ
+`quote` for creating nodes, then mutating them as we need:
+
+```ruby
+# call spec: __.rescue(MyError, :e)
+def __.rescue(klass, ref)
+  rescue_node = quote { begin; rescue; end }.rescue_node
+  # naive impl?
+  rescue_node.copy(exception: klass, reference: ref)
+end
+```
+
+To create a local var read node:
+
+```ruby
+def __.local_get(name)
+  quote { v = 1; v }.body[1].copy(name:)
+end
+
+def __.local_set(name, value)
+  quote { v = 1 }.body[0].copy(name:, value:)
+end
+```
+
+## Unquote that returns multiple statements
+
+A common use for unquote (from the examples above) is e.g.:
+
+```ruby
+quote { unquote foo.map { quote { unquote(it) + 42 } } }
+```
+
+In that case, unquote returns an array of AST nodes. To integrate this into the
+surrounding quote is not a problem. We just need to wrap the array in a `begin`
+block:
+
+```ruby
+def wrap_statements(statements)
+  ast = quote { begin; 1; end }
+  mutate(ast, ast.statements: statements)
+end
+```
+
+We can even simplify this to not use quote (since quote involves a bit of overhead):
+
+```ruby
+def gen_ast(str)
+  Ruby::Prism.parse(str).value.statements.body[0]
+end
+
+def wrap_statements(statements)
+  ast = gen_ast('begin; 1; end')
+  mutate(ast, ast.statements: statements)
+end
+```
+
+# 2026-11-11
+
+## Improving sourcemaps when inlining synthetic ASTs
+
+When we compose synthetic ASTs, we want to conserve the original location.
+Example:
+
+```ruby
+def __.local_get(name)
+  gen_ast('begin; v = 1; v; end').body[1].copy(name:)
+end
+
+# somewhere inside the bowels of *quote*:
+mutate(ast) { |n|
+  case n
+  in __.match("local[]" => name) # pattern detection is a whole other subject
+    next __.gen.local_get(name).copy(location: n.location)
+  end
+}
+```
+
+We can also make the synthetic node API take the form of e.g.:
+
+```ruby
+module Synthetizer
+  module_function
+
+  # The first param is always the original node, which permits us to copy the
+  # original node's location
+  def local_get(orig)
+    replace(orig, gen_ast('begin; v = 1; v; end').body[1], name: n.name)
+  end
+end
+
+# This allows us to do:
+mutate(ast) { |n|
+  case n
+  in __.match("local[]" => name) # pattern detection is a whole other subject
+    next Synthesizer.local_get(n, name)
+  end
+}
+```
+
+## Pattern matching nodes
+
+We may want to have a shorthand for `Ruby::Prism`, and maybe also for common
+node types:
+
+```ruby
+P = Ruby::Prism
+CN = P::CallNode
+AN = P::ArgumentsNode
+```
+
+We can then match like this:
+
+```ruby
+def match_local_get(n)
+  
+  
+  n in CN(
+    name: :[],
+    arguments: AN(
+      arguments: [v]
+    ),
+    receiver: CN(
+      name: :local,
+      receiver: CN(
+        name: :__,
+        receiver: nil
+      )
+    )
+  )
+end
+```
+
+We might imagine a shorter, more convenient way to do this with a DSL?
+
+```ruby
+# our pattern is something like:
+__.local[xxx]
+
+# So we maybe we can do:
+n in Matcher.new.call(:__, ).call(:local).call(:[]).arguments(v)
+```
+
+The problem is that we need to match from the outside inwards, and the above
+syntax matchees calls from the inside out (because in the AST the inside-most
+call node is `__`).
+
+A different way would be maybe:
+
+```ruby
+# Following the tree structure, but with shorter syntax
+n in M.call(:[], arguments: [v], receiver: M.call(:local, receiver: M.call(:__, receiver: nil)))
+```
+
+Somewhat shorter, but still reads quite horribly. Going back to the inside-out
+syntax from above:
+
+```ruby
+n in Matcher.new.call(:__, receiver: nil).call(:local).call(:[], arguments: v)
+```
+
+Better, but what about?
+
+```ruby
+Matcher.pattern { __.local[__?] }.match(ast)
+
+# or
+n in 
+```
+
+A PoC implementation can be found in `test/match.rb`
