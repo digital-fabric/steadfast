@@ -1566,8 +1566,6 @@ We can then match like this:
 
 ```ruby
 def match_local_get(n)
-  
-  
   n in CN(
     name: :[],
     arguments: AN(
@@ -1622,3 +1620,53 @@ n in
 ```
 
 A PoC implementation can be found in `test/match.rb`
+
+# 2026-11-12
+
+## Finding nodes
+
+Another way we can dig and match against an AST is by providing a navigation
+path. Think CSS selectors, but for AST:
+
+```ruby
+Steadfast.find(ast) { CallNode(name: :foo, receiver: nil) } #=> returns found node, or nil
+Steadfast.find_all(ast) { SymbolNode }
+```
+
+So, this kind of DSL is somewhat similar to the Prism DSL for synthesizing, and the
+pattern matching DSL, except that this uses `instance_eval { ... }`. So,
+revisiting the pattern matching syntax:
+
+```ruby
+CN = Ruby::Prism::CallNode
+AN = Ruby::Prism::ArgumentsNode
+
+# matching __.local[__?]
+n in CN(name: :[], arguments: AN(arguments: [v]), receiver: CN(name: :local, receiver: CN(name: :__, receiver: nil)))
+```
+
+## Conclusion
+
+- For internal use, we might have to make do with pattern matching, because it
+  lets us capture properties into variables that we can then use for processing.
+- We can eventually implement `Steadfast.find` and `Steadfast.find_all`.
+- We can provide a `Steadfast.walk` that, like `Steadfast.mutate` walks the tree.
+
+- More generally, in terms of general API design, I like the idea of having a
+  single entrypoint to the steadfast functionality in the form of a set of
+  methods on the `Steadfast` module:
+
+  ```ruby
+  # already implemented
+  Steadfast.ast(obj, **)
+  Steadfast.source(obj, **)
+  Steadfast.translate_backtrace(bt)
+
+  # 
+  Steadfast.quote(*) { * }
+  Steadfast.mutate(ast, *) { * }
+  Steadfast.walk(ast) { * }
+  Steadfast.find(ast) { * }
+  Steadfast.find_all(ast) { * }
+
+  ```
