@@ -1670,3 +1670,423 @@ n in CN(name: :[], arguments: AN(arguments: [v]), receiver: CN(name: :local, rec
   Steadfast.find_all(ast) { * }
 
   ```
+
+## More uses of eval in the wild
+
+Those projects are vibe-coded, but still the idea in itself is interesting:
+
+- https://github.com/julik/protostar - pure-Ruby protobufs compiler - takes a
+  `.proto` spec file and compiles it into a decoder/encoder. Interestingly, the
+  compiled code is not a low-level builder of classes and decoder/encoder, but
+  instead emits a DSL, which raises the question, why?
+
+- https://github.com/yosiat/panko_serializer - a pure-ruby JSON serializer -
+  compiles serializers for fixed-shape objects, so it seems. This is also
+  vibe-coded, so it seems,
+
+# 2026-11-13
+
+## Macros
+
+Some possible uses:
+
+- DSL
+- Loop unrolling
+- Method decoration
+
+How would the API look?
+
+```ruby
+macro(:add_getter) { |k, v|
+  __.def(unquote(k)) { unquote(v) }
+}
+
+add_getter(:foo, 42)
+```
+
+Another way to do this would be:
+
+```ruby
+def add_getter(k, v)
+  ast = Steadfast.quote { __.def(unquote(k)) { unquote(v) } }
+  Steadfast.eval_ast(ast, self)
+end
+```
+
+# 2026-11-18
+
+## Tool for determining if an AST is "static"
+
+When compiling a template, Papercraft needs to know if an attribute, or an
+"innerText" of a tag is static, meaning the value can be determined at compile
+time. If yes, we can safely emit a string containing the escaped value, instead of emitting a call to `ERB.escape_html` with the dynamic value.
+
+Hence, it would *behoove* us to have a utility for that:
+
+```ruby
+Steadfast.static?(ast)
+```
+
+We can check if an AST is totally static by checking for the absence of:
+
+- method calls
+- local var read / write
+- instance var read / write
+- class var read / write
+- logic: if, case, while, rescue, etc.
+
+```ruby
+# @param ast [Prism::Node]
+# @return [bool]
+def static?(ast)
+  !find(ast) do
+    case it
+    when P::CallNode, P::LocalVariableWriteNode, P::LocalVariableReadNode, ...
+      true
+    end
+    false
+  end
+end
+```
+
+Easy!
+
+## More on inlining
+
+One major hurdle we might have with inlining is that we can't always inline
+things. We can inline only values that are known at the moment of inlining. Take
+the following exmaple:
+
+```ruby
+layout = ->(**, &) {
+  html {
+    body {
+      render(**, &)
+    }
+  }
+}
+
+template = Papercraft.apply(layout, :foo) { |foo:, **| h1 foo }
+Papercraft.html(template) #=> HTML
+```
+
+The call to `#apply` should already perform the inline! In this case, there's no
+problem to do the inlining, since apply gets the inner template as a block and
+can inline it. But let's look at a different case:
+
+```ruby
+layout = ->(**, &) {
+  html {
+    body {
+      render &, **
+    }
+  }
+}
+
+# ad-hoc usage of the layout
+Papercraft.html(layout) { h1 'foo' } #=> HTML
+
+# if we want a reusable template, we'll do like the above, using apply:
+template = Papercraft.apply(layout, :foo) { |foo:, **| h1 foo }
+```
+
+So, first of all there's the realisation that we need to do the inling when
+doing the apply, otherwise there's no point, since it's a one-off thing.
+
+We can also provide a template as a normal argument:
+
+```ruby
+layout = ->(header:, content:, **) {
+  html {
+    body {
+      header { render header, ** }
+      content { render content, ** }
+    }
+  }
+}
+
+template = Papercraft.apply(layout, header: ->(**) { h1 'Header' })
+
+Papercraft.html(template, content: ->(**) { p 'Content' })
+```
+
+So, when we call `Papercraft.apply` we only know what `header` is, but `content`
+is still not bound to a value that we know of. So, here's how this can be done:
+
+```ruby
+# we put aside for the moment the application of values other than sub-templates
+def apply(template, **kwargs, &block)
+  Steadfast.inline(template) { |n| # visited node
+    # when we call inline, we need to provide a block that visits each node, and
+    # if that node needs to be replaced with an inlined AST, it returns the AST
+    # of the inlined node, so for example, we inline calls to `render` as
+    # follows:
+    case n
+    when P::CallNode(receiver: nil, name: :render)
+      arg0 = n.arguments.arguments[0]
+      if arg0 in P::CallNode(receiver: nil)
+        if (v = kwargs[arg0.name]) && v.is_a?(Proc)
+          next Steadfast.to_ast(v) #=> we return the AST to be inlined
+          end
+      end
+    end
+    nil
+  }
+end
+```
+
+So basically, inline is an enhanced version of mutate that knows how to inline
+ASTs into each other (more specifically, ASTs of Procs) and perform
+argument/parameter substitution.
+
+## Inlining things other than Procs
+
+We can inline methods, but is there any meaning for inlining of other stuff?
+Well, we can inline values as substitutions for local variables, but we can do
+this with `mutate`, so no, `inline` is only for inlining procs or methods, so in
+principle the block given to `inline` can return a proc or a method:
+
+```ruby
+def apply(template, **kwargs, &block)
+  Steadfast.inline(template) { |n| # visited node
+    case n
+    when P::CallNode(receiver: nil, name: :render)
+      arg0 = n.arguments.arguments[0]
+      if arg0 in P::CallNode(receiver: nil)
+        v = kwargs[arg0.name]
+        next v if v.is_a?(Proc)
+      end
+    end
+    nil
+  }
+end
+```
+
+## Alternative syntax to `render` for rendering sub-templates
+
+I don't like the current `render_children` syntax. Some alternatives:
+
+```ruby
+# using yield for rendering the given block
+layout = ->(**) {
+  html {
+    body {
+      yield **
+    }
+  }
+}
+
+# using render
+layout = ->(foo:, bar:, **) {
+  html {
+    body {
+      render(foo, **)
+      render(bar, **)
+    }
+  }
+}
+```
+
+## More inlining
+
+So, we established that with Papercraft, we inline at the moment of apply. But
+there are also other things that we can inline, if they are available in the
+binding, or if they are defined as extensions, that we can inline when compiling
+the template:
+
+```ruby
+header ->(title) {
+  h2(title)
+}
+
+card = ->(title:, text:) {
+  tag.card {
+    render header, title
+    p(text)
+  }
+}
+
+template = ->() {
+  div {
+    render card, title: 'Foo', text: 'foofoo'
+    render card, title: 'Bar', text: 'barbar'
+  }
+}
+
+# inlined it will be:
+->() {
+  div {
+    tag.card {
+      h2('Foo')
+      p('foofoo')
+    }
+    tag.card {
+      h2('Bar')
+      p('barbar')
+    }
+  }
+}
+```
+
+So inlining needs to be recursive:
+
+```ruby
+def inline_template(template, **kwargs)
+  ast = Steadfast.to_ast(template)
+  ast2 = Steadfast.inline(ast) do |n|
+    if n in P::CallNode(receiver: nil, name: :render)
+      v = inline_render_call(n, kwargs, template.binding)
+      next v if v
+    end
+    nil
+  end
+  Steadfast.eval_ast(ast2, template.binding)
+end
+
+# @param node [Prism::Node]
+# @param kwargs [Hash] template kwargs
+# @param binding [Binding] template binding
+# @return [Proc, nil]
+def inline_render_call(node, kwargs, binding)
+  arg0 = node.arguments.arguments[0]
+  if arg0 in P::CallNode(receiver: nil)
+    v = find_inlined_value(arg[0].name, kwargs, binding)
+    return inline_template(v) if v.is_a?(Proc)
+  end
+  nil
+end
+
+# Finds a inline value in the given kwargs or binding
+#
+# @param name [Symbol] call name
+# @param kwargs [Hash] template kwargs
+# @param binding []
+def find_inline_value(name, kwargs, binding)
+  v = kwargs[name]
+  return v if v
+
+  if binding.local_variable_defined?(name)
+    return binding.local_variable_get(name)
+  end
+
+  nil
+end
+```
+
+## Derivative ASTs and source maps
+
+When doing an `eval_ast` or converting synthesized / modified ASTs to code and
+then to actual proc or method, we keep a source map, which we can then use to
+translate error backtrace entries to the original source locations.
+
+But what happens when we create a 2nd-order derivation? If we further derive an
+AST from the derived proc/method, we'll get (with the current
+`translate_backtrace` implementation) incorrect source locations. Keeping track
+of the original locations will be impossible, because any part of the derived
+proc's code might come from any arbitrary location.
+
+So what we need to do is:
+
+A. Make the backtrace translation recursive, so if a backtrace entry translates
+to a synthetic source location, we need to further search for it. This should be
+quite simple.
+
+B. Automatically give each piece of synthesized code a unique fake source
+filename, so it can be used for referencing source locations. Right now, this is
+done by calling `to_source` with the `source_location:` option, but should be
+done automatically.
+
+## Interesting article: The Magic of Partial Evaluation
+
+Touches on some of the things I'm doing:
+
+https://jimmyhmiller.com/magic-of-partial-evaluation
+
+# 2026-11-20
+
+## Pipelines
+
+Can we do pipelines with AST transformation?
+
+```ruby
+'zip, br,zstd'.pipe {
+  _.split(',').map(&:strip) >>
+  select_compression(prefer: 'br') >>
+  setup_compression()
+}
+
+# which might be expanded into:
+_ = `zip, br,zstd`
+_ = _.split(',').map(&:strip)
+_ = select_compression(_, prefer: 'br')
+setup_compression(_)
+
+# Or, if we want to convert to a single expression without local variable
+# assignment:
+setup_compression(select_compression(`zip, br,zstd`.split(',').map(&:strip), prefer: 'br'))
+```
+
+This is where we can use a macro:
+
+```ruby
+module Pipeline
+  include Steadfast::Macro
+
+  macro def pipe(ast)
+    mutate(ast) do |n, &|
+      next nil if !(n in P::CallNode(name: :>>, receiver: P::CallNode))
+
+      call_node = n.arguments.arguments[0]
+      arguments = Steadfast::Compose.arguments(mutate(n.receiver, &), call_node.arguments)
+      call_node.copy(arguments:)
+    }
+  end
+end
+
+class ServerConnection
+  include Pipeline
+
+  def auto_compress!(accept_encoding, preferred)
+    pipe {
+      accept_encoding.split(',').strip(&:) >>
+      select_compression_algorithm(preferred:) >>
+      setup_compression()
+    }
+  end
+
+  # This is automatically "expanded" to:
+  def auto_compress!(accept_encoding, preferred)
+    setup_compression(
+      select_compression_algorithm(
+        accept_encoding.split(',').strip(&:),
+        preferred:
+      )
+    )
+  end
+end
+```
+
+## An assert macro
+
+```ruby
+module Testing
+  include Steadfast::Macro
+
+  macro def assert(ast)
+    quote {
+      if Testing.test_mode?
+        raise "Assertion failed" if !(unquote(ast))
+      end
+    }
+  end
+end
+
+class MyTest
+  include Testing
+
+  def test_this
+    assert 1 == 1 #=> nil
+    assert 1 == 2 #=> BOOM!
+  end
+end
+```

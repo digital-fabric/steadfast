@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'steadfast/sourcifier'
+require 'steadfast/rewriter'
 
 # Tell Ruby to keep script lines in memory, so calling Proc#syntax_tree or
 # Method#syntax_tree will work.
@@ -67,6 +68,10 @@ module Steadfast
     def to_source(obj, **opts)
       ast = to_ast(obj)
       Sourcifier.new(**opts).to_source(ast)
+    end
+
+    def rewrite(ast, **replacements, &block)
+      Rewriter.rewrite(ast, **replacements, &block)
     end
 
     private

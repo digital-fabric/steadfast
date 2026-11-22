@@ -78,42 +78,34 @@ class SourcifierPrismTest < Minitest::Test
 end
 
 class SourcifierSourceMapTest < Minitest::Test
-  class Mutator
-    def initialize(mutate_block)
-      @mutate_block = mutate_block
+  class Rewriter
+    def initialize(rewrite_block)
+      @rewrite_block = rewrite_block
     end
-    
+
     def method_missing(sym, n)= sym !~ /^visit_/ ? super(sym, n) : visit(n)
-  
+
     def visit(n)
-      n2 = @mutate_block.(n)
+      n2 = @rewrite_block.(n)
       return n2 if n2 != n
-  
-      mutations = {}
+
+      replacements = {}
       n.deconstruct_keys(nil).each do |k, v|
         if v.is_a?(Ruby::Prism::Node)
           res = visit(v)
-          mutations[k] = res if (res != v)
+          replacements[k] = res if (res != v)
         elsif v.is_a?(Array) && v[0].is_a?(Ruby::Prism::Node)
           v2 = v.map { visit(it) }
-          mutations[k] = v2 if v2 != v
+          replacements[k] = v2 if v2 != v
         end
       end
-      mutations.empty? ? n : n.copy(**mutations)
+      replacements.empty? ? n : n.copy(**replacements)
     end
   end
-  
-  def mutate(ast, **mutations, &block)
-    block ||= ->(n) do
-      if n.is_a?(Ruby::Prism::StatementsNode) && mutations.has_key?(n.body)
-        v = mutations[n.body]
-        v = v.body if v.is_a?(Ruby::Prism::StatementsNode)
-        n.copy(body: v)
-      else
-        mutations.has_key?(n) ? mutations[n] : n
-      end
-    end
-    ast.accept(Mutator.new(block))
+
+  def rewrite(ast, **replacements, &block)
+    block ||= ->(n) { replacements.has_key?(n) ? replacements[n] : n }
+    ast.accept(Rewriter.new(block))
   end
 
   class E1 < StandardError
@@ -152,7 +144,7 @@ class SourcifierSourceMapTest < Minitest::Test
 
   def inlined_lambda(l)
     ast1 = Steadfast.to_ast(l)
-    ast2 = mutate(ast1) do |n|
+    ast2 = rewrite(ast1) do |n|
       case n
       in Ruby::Prism::CallNode(receiver: nil, name: :foo)
         Steadfast.to_ast(L2).body.body[0]
@@ -204,7 +196,7 @@ class SourcifierSourceMapTest < Minitest::Test
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E2_LINE, line
-    
+
     e = catch_error { l.(3) }
     assert_kind_of E3, e
     bt = Steadfast.translate_backtrace(e.backtrace)
@@ -213,7 +205,7 @@ class SourcifierSourceMapTest < Minitest::Test
     assert_equal E3_LINE, line
   end
 
-  def test_sourcemap_mutated_single_line_lambda_exception_backtrace
+  def test_sourcemap_rewritten_single_line_lambda_exception_backtrace
     l = inlined_lambda(L4)
 
     e = catch_error { l.(2) }
@@ -222,7 +214,7 @@ class SourcifierSourceMapTest < Minitest::Test
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E2_LINE, line
-    
+
     e = catch_error { l.(3) }
     assert_kind_of E3, e
     bt = Steadfast.translate_backtrace(e.backtrace)
@@ -240,7 +232,7 @@ class SourcifierSourceMapTest < Minitest::Test
   }
   def inlined_lambda_without_inlined_filenames(l)
     ast1 = Steadfast.to_ast(l)
-    ast2 = mutate(ast1) do |n|
+    ast2 = rewrite(ast1) do |n|
       case n
       in Ruby::Prism::CallNode(receiver: nil, name: :foo)
         L5.syntax_tree.body.body[0]
@@ -278,7 +270,7 @@ class SourcifierSourceMapTest < Minitest::Test
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE + 1, line
-    
+
     e = catch_error { l.(3) }
     assert_kind_of E3, e
     bt = Steadfast.translate_backtrace(e.backtrace)

@@ -148,7 +148,7 @@ end
 
 ## Next steps
 
+- [v] Blog post by the weekend
 - [ ] Implement `Steadfast.eval_ast(ast, receiver, binding, source_location: nil)`
-- [ ] Blog post by the weekend
 - [ ] Implement `Steadfast.mutate` with lots of tests
 - [ ] Use `Steadfast.mutate` for implementing `Steadfast.eval_ast` with exception backtrace translation
