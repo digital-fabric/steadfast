@@ -74,6 +74,17 @@ module Steadfast
       Rewriter.rewrite(ast, **replacements, &block)
     end
 
+    def eval_ast(ast, eval_receiver = nil, eval_binding = nil)
+      raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
+      
+      src = to_source(ast)
+      if eval_receiver
+        eval_receiver.instance_eval(src)
+      else
+        eval(src, eval_binding || binding)
+      end
+    end
+
     private
 
     # Sets 
