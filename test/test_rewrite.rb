@@ -247,3 +247,142 @@ class RewritePipeTest < Minitest::Test
     assert_equal ((4 + 3) * 6) ** 2, p.()
   end
 end
+
+class SyntheticASTSourceMappingTest < Minitest::Test
+  def make_inlined_lambda(l, inline_bodies)
+    ast = Steadfast.to_ast(l)
+    ast2 = Steadfast.rewrite(ast) { |n|
+      if n in Ruby::Prism::CallNode(receiver: nil, name: :foo | :bar | :baz)
+        ast = Steadfast.to_ast(inline_bodies[n.name])
+        next ast.body.body[0] if ast
+      end
+      n
+    }
+    Steadfast.eval_ast(ast2, nil, l.binding)
+  end
+
+  def capture_exception
+    yield
+    nil
+  rescue => e
+    e
+  end
+
+  def bt_entry_location(entry)
+    if (m = entry.match(/^([^\:]+)\:(\d+)/))
+      [m[1], m[2].to_i]
+    else
+      nil
+    end
+  end
+
+  def test_inlined_ast_source_mapping
+    l = ->(x) do
+      case x
+      when 1
+        foo
+      when 2
+        bar
+      when 3
+        baz
+      when 4
+        bad
+      end
+    end
+
+    lines = { foo: __LINE__ + 2, bar: __LINE__ + 3, baz: __LINE__ + 4 }
+    inline_bodies = {
+      foo: -> { raise 'foo' },
+      bar: -> { raise 'bar' },
+      baz: -> { raise 'baz' }
+    }
+    l2 = make_inlined_lambda(l, inline_bodies)
+    assert_kind_of Proc, l2
+
+    e = capture_exception { l2.(1) }
+    assert_kind_of RuntimeError, e
+    assert_equal 'foo', e.message
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    assert_equal [__FILE__, lines[:foo]], bt_entry_location(bt[0])
+    assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
+
+    e = capture_exception { l2.(2) }
+    assert_kind_of RuntimeError, e
+    assert_equal 'bar', e.message
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    assert_equal [__FILE__, lines[:bar]], bt_entry_location(bt[0])
+    assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
+
+    e = capture_exception { l2.(3) }
+    assert_kind_of RuntimeError, e
+    assert_equal 'baz', e.message
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    assert_equal [__FILE__, lines[:baz]], bt_entry_location(bt[0])
+    assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
+  end
+
+  def source_location(node)
+    [(node.send(:source).__filename__ || raise('No filename set')), node.location.start_line]
+  end
+
+  # @param body_node [Ruby::Prism::Node]
+  # @param statements [Array<Ruby::Prism::Node>]
+  def make_loop(body_node, statements)
+    loc = source_location(body_node)
+    loop_node = Ruby::Prism.parse('loop do; 1; end', filepath: loc[0], line: loc[1]).value.statements.body[0]
+    loop_node.send(:source).__filename__ = loc[0]
+
+    loop_block_body = loop_node.block.body
+    Steadfast.rewrite(loop_node, loop_block_body => { body: statements })
+  end
+
+  def wrap_with_loop(proc)
+    ast = Steadfast.to_ast(proc)
+    params = ast.parameters
+    statements = ast.body.body
+
+    loop = make_loop(ast.body, statements)
+    ast2 = Steadfast.rewrite(ast, ast.body => { body: [loop] })
+    Steadfast.eval_ast(ast2)
+  end
+
+  # derivative of inlined
+  def test_inlined_looped_ast_source_mapping
+    l_body_line = __LINE__ + 2
+    l = ->(x) do
+      case x
+      when 1
+        foo
+      when 2
+        bar
+      when 3
+        baz
+      when 4
+        break 42
+      end
+    end
+
+    lines = { foo: __LINE__ + 2, bar: __LINE__ + 3, baz: __LINE__ + 4 }
+    inline_bodies = {
+      foo: -> { raise 'foo' },
+      bar: -> { raise 'bar' },
+      baz: -> { raise 'baz' }
+    }
+    l2 = make_inlined_lambda(l, inline_bodies)
+    assert_kind_of Proc, l2
+
+    l3 = wrap_with_loop(l2)
+
+    assert_equal 42, l3.(4)
+    
+    
+    e = capture_exception { l3.(1) }
+    assert_kind_of RuntimeError, e
+    assert_equal 'foo', e.message
+    bt = Steadfast.translate_backtrace(e.backtrace)
+    assert_equal [__FILE__, lines[:foo]], bt_entry_location(bt[0])
+    assert_equal [__FILE__, l_body_line], bt_entry_location(bt[1])
+    assert_equal [__FILE__, l_body_line], bt_entry_location(bt[2])
+    assert_equal [__FILE__, __LINE__ - 7], bt_entry_location(bt[3])
+  end
+end
