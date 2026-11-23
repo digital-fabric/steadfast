@@ -192,3 +192,17 @@ Steadfast.rewrite(l1_ast) do |n|
   end
 end
 ```
+
+## Other work done
+
+I've also implemented `Steadfast.eval_ast`, which is a helper method for
+evaluating an AST without having to pass first by `Steadfast.to_source` before
+calling `eval`. In the future this API may need to be modified according to the
+usage patterns that will be established as this is developed.
+
+I've also published a blog post describing the work done.
+
+## The Next Steps
+
+- Add tests to verify that source mapping works correctly for synthetic ASTs.
+- Work on tools for generating arbitrary AST nodes.

@@ -373,9 +373,9 @@ class SyntheticASTSourceMappingTest < Minitest::Test
 
     l3 = wrap_with_loop(l2)
 
+    # Test break from loop
     assert_equal 42, l3.(4)
-    
-    
+
     e = capture_exception { l3.(1) }
     assert_kind_of RuntimeError, e
     assert_equal 'foo', e.message

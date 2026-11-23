@@ -2090,3 +2090,84 @@ class MyTest
   end
 end
 ```
+
+# 2026-11-23
+
+## Partial evaluation and specialization
+
+https://phoenix.labri.fr/software/tempo/
+https://jimmyhmiller.com/magic-of-partial-evaluation
+
+For example, when doing `Papercraft.apply`, we can "specialize" the template by
+analyzing and identifying all parts of it that are static (e.g. value is known
+at compile time). Those parts can be computed at runtime, and replaced by the
+computation result.
+
+So, maybe we can have a `Steadfast.specialize` method, such that:
+
+```ruby
+template = ->(foo) {
+  if foo
+    div "foo"
+  else
+    div "bar"
+  end
+}
+```
+
+So, if we had a `Steadfast.specialize` tool, we could do:
+
+```ruby
+specialized_template = Steadfast.specialize(template, foo: true)
+
+# Which would give us
+specialized_template = ->() {
+  div "foo"
+}
+```
+
+This means we need to somehow be able to tell if a statement is all static
+(given the specialization parameters, in this case the value of `foo`), or are
+there any method calls (apart from HTML tag method calls). So we might be able
+to do this with a `walk` tool:
+
+```ruby
+Steadfast.specialize(template, foo: true) { |n, values|
+  # the block just needs to return true if the visited node is static
+}
+
+# @param l [Proc]
+# @param values [Hash]
+# @block [Proc, nil]
+# @return [P::Node]
+def Steadfast.specialize(l, values, &block)
+  Steadfast.rewrite(ast) { |n, &b|
+    # we return n (no rewrite) if dynamic
+    case n
+    in  P::CallNode
+      next n if !block || !block.(n)
+
+    in  P::LocalVariableWriteNode,
+        P::InstanceVariableReadNode, P::InstanceVariableWriteNode
+
+    in P::LocalVariableReadNode
+      next n if !(l.binding.local_variable_defined?(n.name) || values.key?(n.name))
+
+      # rewrite with actual value
+      Steadfast.unquote(
+        values.key?(n.name) ? values[n.name] : l.binding.local_variable_get(n.name)
+      )
+    in P::StatementsNode
+      n2 = Steadfast.rewrite(ast, &b)
+      next n if n2 == n
+
+      # compile time evaluation
+      value = eval(Steadfast.to_source(n2), l.binding)
+      Steadfast.unquote(value)
+    else
+      n
+    end
+  }
+end
+```
+
