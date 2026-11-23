@@ -1,3 +1,9 @@
+# 0.0.3 2026-11-23
+
+- Implement `Steadfast.eval_ast`
+- Implement `Steadfast.rewrite`
+- Improve sourcemap calculation when doing inlining
+
 # 0.0.2 2026-11-09
 
 - Emit newline upon detecting a source change while sourcifying an AST
