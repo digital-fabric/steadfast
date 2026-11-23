@@ -1,3 +1,8 @@
+# 0.1.0 2026-11-23
+
+- Improve source mapping, make it work for derivative synthetic ASTs
+- Add automatic source location info in `Steadfast.eval_ast`
+
 # 0.0.3 2026-11-23
 
 - Implement `Steadfast.eval_ast`

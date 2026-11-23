@@ -204,5 +204,6 @@ I've also published a blog post describing the work done.
 
 ## The Next Steps
 
-- Add tests to verify that source mapping works correctly for synthetic ASTs.
-- Work on tools for generating arbitrary AST nodes.
+- [v] Add tests to verify that source mapping works correctly for synthetic ASTs.
+- [ ] Work on tools for generating arbitrary AST nodes.
+
