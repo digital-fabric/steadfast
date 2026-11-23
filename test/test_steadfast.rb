@@ -37,4 +37,34 @@ class EvalASTTest < Minitest::Test
     assert_raises(ArgumentError) { Steadfast.eval_ast(42) }
     assert_raises(ArgumentError) { Steadfast.eval_ast(:foo) }
   end
+
+  def test_eval_ast_with_source_location
+    l0 = -> { 0 }
+    source_location = ["(test_eval_ast_with_source_location-#{SecureRandom.hex(4)})", __LINE__ - 1]
+    l1 = -> { 42 }
+    ast = Steadfast.to_ast(l1)
+    l2 = Steadfast.eval_ast(ast, source_location:)
+    assert_equal 42, l2.()
+    assert_equal source_location, l2.source_location
+  end
+
+  def test_eval_ast_caller_source_location
+    l1 = -> { 42 }
+    ast = Steadfast.to_ast(l1)
+    source_location = [__FILE__, __LINE__ + 1]
+    l2 = Steadfast.eval_ast(ast, source_location: :caller)
+    assert_equal 42, l2.()
+    assert_equal source_location, l2.source_location
+  end
+
+  def test_eval_ast_nil_source_location
+    l1 = -> { 42 }
+    ast = Steadfast.to_ast(l1)
+    source_location = [__FILE__, __LINE__ + 1]
+    l2 = Steadfast.eval_ast(ast)
+    assert_equal 42, l2.()
+    loc = l2.source_location
+    assert_match /^\(steadfast-[0-9a-f]+\)$/, loc[0]
+    assert_equal 1, loc[1]
+  end
 end

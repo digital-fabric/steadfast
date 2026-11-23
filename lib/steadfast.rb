@@ -86,14 +86,21 @@ module Steadfast
     # @param eval_receiver [any]
     # @param eval_binding [Binding, nil]
     # @return [any]
-    def eval_ast(ast, eval_receiver = nil, eval_binding = nil)
+    def eval_ast(ast, eval_receiver = nil, eval_binding = nil, source_location: nil)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
 
-      src = to_source(ast)
+      case source_location
+      when nil
+        source_location = ["(steadfast-#{SecureRandom.hex(4)})", 1]
+      when :caller
+        l = caller_locations[0]
+        source_location = [l.path, l.lineno]
+      end
+      src = to_source(ast, source_location:, sourcemap: true)
       if eval_receiver
         eval_receiver.instance_eval(src)
       else
-        eval(src, eval_binding || binding)
+        eval(src, eval_binding || binding, source_location[0], source_location[1])
       end
     end
 
