@@ -70,10 +70,22 @@ module Steadfast
       Sourcifier.new(**opts).to_source(ast)
     end
 
+    # Rewrites the given AST using the given hash of node replacements or a
+    # rewrite block. Returns either the original AST, or a copy with changes.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @param replacements [Hash]
+    # @return [Ruby::Prism::Node]
     def rewrite(ast, **replacements, &block)
       Rewriter.rewrite(ast, **replacements, &block)
     end
 
+    # Evaluates the given AST in the context of the given receiver or binding.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @param eval_receiver [any]
+    # @param eval_binding [Binding, nil]
+    # @return [any]
     def eval_ast(ast, eval_receiver = nil, eval_binding = nil)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
       
@@ -87,7 +99,12 @@ module Steadfast
 
     private
 
-    # Sets 
+    # Sets the source filename for the given ast to the source location of the
+    # given proc or method.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @param obj [Proc, Method]
+    # @return [void]
     def set_source_filename(ast, obj)
       source = ast.send(:source)
       source.__filename__ ||= obj.source_location.first

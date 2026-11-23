@@ -151,24 +151,19 @@ class RewriteTailCallTest < Minitest::Test
     l = eval("-> { loop do; 1; end }")
     loop_node = Steadfast.to_ast(l).body.body[0]
     loop_block_body = loop_node.block.body
-    ast2 = Steadfast.rewrite(loop_node, loop_block_body => { body: statements })
-    ast2
+    Steadfast.rewrite(loop_node, loop_block_body => { body: statements })
   end
 
   def rewrite_with_tail_call(meth)
     ast = Steadfast.to_ast(meth)
-
     params = ast.parameters
     *body, tail = ast.body.body
 
     raise "Not a tail call method!" if !(tail.is_a?(Ruby::Prism::CallNode) && tail.name == meth.name)
 
-    ast2 = make_def_node(ast.name, params)
-
     body2 = make_loop(*body, convert_tail_call(tail, params))
-
-    ast3 = Steadfast.rewrite(ast2, ast2.body => { body: [body2] })
-    eval(Steadfast.to_source(ast3))
+    ast2 = Steadfast.rewrite(ast, ast.body => { body: [body2] })
+    eval(Steadfast.to_source(ast2))
   end
 
   def make_multi_write_node(names, values)
@@ -186,7 +181,7 @@ class RewriteTailCallTest < Minitest::Test
 
   def fact(n, acc = 1)
     return acc if n <= 1
-    fact(n - 1, n * acc) # <-- Tail position (last operation)
+    fact(n - 1, n * acc)
   end
   alias_method :orig_fact, :fact
 
@@ -209,7 +204,7 @@ class RewriteTailCallTest < Minitest::Test
   end
 end
 
-class RewritePipelineTest < Minitest::Test
+class RewritePipeTest < Minitest::Test
   def add(x, y); x + y; end
   def mul(x, y); x * y; end
   def pow(x, y); x ** y; end
@@ -224,7 +219,7 @@ class RewritePipelineTest < Minitest::Test
     Steadfast.rewrite(call_node, call_node.arguments => { arguments: })
   end
 
-  def test_rewrite_pipeline
+  def test_rewrite_pipe
     l = -> { 4 >> add(3) >> mul(6) >> pow(2) }
     l_ast = Steadfast.to_ast(l)
 
@@ -234,7 +229,7 @@ class RewritePipelineTest < Minitest::Test
     assert_equal ((4 + 3) * 6) ** 2, p.()
   end
 
-  def test_rewrite_pipeline_recursive_block
+  def test_rewrite_pipe_syntax_recursive_block
     l = -> { 4 >> add(3) >> mul(6) >> pow(2) }
     l_ast = Steadfast.to_ast(l)
 

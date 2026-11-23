@@ -149,6 +149,47 @@ end
 ## Next steps
 
 - [v] Blog post by the weekend
-- [ ] Implement `Steadfast.eval_ast(ast, receiver, binding, source_location: nil)`
-- [ ] Implement `Steadfast.mutate` with lots of tests
-- [ ] Use `Steadfast.mutate` for implementing `Steadfast.eval_ast` with exception backtrace translation
+- [v] Implement `Steadfast.eval_ast(ast, receiver, binding, source_location: nil)`
+- [v] Implement `Steadfast.mutate` with lots of tests
+
+# 2026-11-22
+
+- [v] Use the term "rewrite" instead of "mutate". mutation in CS in general is a
+  term used for changing a variable or a data structure in place. Here what we
+  do is to create a copy with changes, so I think to avoid confusion we better
+  use the term "rewrite", as in, "rewrite this AST".
+- [v] I've implemented `Steadfast.rewrite`, and wrote some tests, including
+  three different use cases: inlining, tail call rewrite, and pipeline syntax
+  rewrite.
+
+## On the design of Steadfast.rewrite
+
+The `Steadfast.rewrite` method can be called in two forms:
+
+1. Providing node replacements as key-value pairs:
+
+```ruby
+Steadfast.rewrite(l1_ast, n1 => n2, **)
+
+# In order to be able to replace array contents for different fields in nodes
+# such as StatementsNode etc, replacement values can also be expresed as hashes
+# with fieldname as keys and replacement arrays as values
+Steadfast.rewrite(
+  l1_ast,
+  l1_ast.body => { body: [*l1_ast.body.body, tail_statement] }
+)
+```
+
+2. Providing a bloc that visits each node and returns either the original node,
+   or a replacement node (or nil):
+
+```ruby
+# inline the foo implementation
+Steadfast.rewrite(l1_ast) do |n|
+  if (n in Ruby::Prism::CallNode(receiver: nil, name: :foo))
+    inlined_foo
+  else
+    n
+  end
+end
+```
