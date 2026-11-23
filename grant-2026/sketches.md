@@ -112,7 +112,7 @@ def compile_html(ast)
   html_parts = []
   flusher = -> {
     return nil if html_parts.empty?
-    
+
     html = html_parts.join; html_parts.clear
     quote(locals: [:__buffer__]) { __buffer__ << unquote(html) }
   }
@@ -496,7 +496,7 @@ test 'raise' {
   expect (m = 'foo'.match(/f(.+)/)) && m[1] == 'oo'
 }
 
-# custom expect 
+# custom expect
 ```
 
 With this syntax, we can avoid implementing expect with a block. Instead We need
@@ -789,7 +789,7 @@ def emit_wildcard_childless_root_code(root_path)
     ->(path, params) {
       unquote(
         root_path != '/' ?
-          quote { return if path != unquote(re) }) : :__nop__        
+          quote { return if path != unquote(re) }) : :__nop__
       )
       dynamic_map[unquote(root_path)]
     }
@@ -857,7 +857,7 @@ quote {
     __.when nil
       return nil
     __.else {
-      __.case ... 
+      __.case ...
     }
   }
 }
@@ -1121,7 +1121,7 @@ def rewrite_with_tail_call(meth)
   *body, tail = ast.body.body
 
   raise "Not a tail call method!" if !(tail.is_a?(Prism::CallNode) && tail.name == meth.name)
-  
+
   ast2 = quote {
     __.def(unquote(meth.name), unquote(params)) do
       loop {
@@ -1138,7 +1138,7 @@ end
 def convert_tail_call(tail, params)
   arg_count = 0
   quote {
-    # __.assign(left, right), in this case we assign 
+    # __.assign(left, right), in this case we assign
     __.assign(
       unquote([*params.requireds.map(&:name), *params.optionals.map(&:name)]),
       unquote(tail.arguments.arguments)
@@ -1330,7 +1330,7 @@ How would the API for this look?
 
 ```ruby
 Steadfast.inline_ast(layout_ast) { |n|
-  # this block is invoked for each CallNode or a 
+  # this block is invoked for each CallNode or a
   # anonymous BlockArgumentNode (where expression is nil)
 
   # the block is expected to either return an AST, which will be inlined (with
@@ -1616,7 +1616,7 @@ Better, but what about?
 Matcher.pattern { __.local[__?] }.match(ast)
 
 # or
-n in 
+n in
 ```
 
 A PoC implementation can be found in `test/match.rb`
@@ -1662,7 +1662,7 @@ n in CN(name: :[], arguments: AN(arguments: [v]), receiver: CN(name: :local, rec
   Steadfast.source(obj, **)
   Steadfast.translate_backtrace(bt)
 
-  # 
+  #
   Steadfast.quote(*) { * }
   Steadfast.mutate(ast, *) { * }
   Steadfast.walk(ast) { * }

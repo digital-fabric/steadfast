@@ -25,7 +25,7 @@ module Steadfast
 
   class << self
     # Returns the global Steadfast source map hash. Currently *not* thread-safe.
-    # 
+    #
     # @return [Hash] source map
     def sourcemap
       @sourcemap ||= {}
@@ -88,7 +88,7 @@ module Steadfast
     # @return [any]
     def eval_ast(ast, eval_receiver = nil, eval_binding = nil)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
-      
+
       src = to_source(ast)
       if eval_receiver
         eval_receiver.instance_eval(src)

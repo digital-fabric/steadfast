@@ -49,7 +49,7 @@ module Steadfast
       n.deconstruct_keys(nil).each do |k, v|
         if v.is_a?(Ruby::Prism::Node)
           v2 = visit(v)
-          changes[k] = v2 if (v2 != v)          
+          changes[k] = v2 if v2 != v
         elsif v in [Ruby::Prism::Node, *]
           v2 = v.map { visit(it) }
           changes[k] = v2 if v2 != v

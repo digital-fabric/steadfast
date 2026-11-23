@@ -711,7 +711,7 @@ module Steadfast
     # @return [void]
     def emit_newline
       return if @buffer[-1] == "\n"
-      
+
       @buffer << "\n"
       @line += 1
     end

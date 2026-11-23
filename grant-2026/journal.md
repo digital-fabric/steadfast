@@ -87,7 +87,6 @@ end
 - Source maps
 - The same but for code derived from code derived from code
 - Interaction with `error_highlight` (https://github.com/ruby/error_highlight)
-- Interaction with `
 
 2. Examples + benchmarks
 

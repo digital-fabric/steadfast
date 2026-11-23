@@ -32,7 +32,7 @@ class Matcher
   end
 
   attr_reader :type, :props
-  
+
   def initialize(type = nil, props = nil)
     @type = type
     @props = props
