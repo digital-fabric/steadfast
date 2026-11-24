@@ -1,3 +1,5 @@
-proc do
-  :bar
-end
+-> {
+  proc do
+    :bar
+  end
+}

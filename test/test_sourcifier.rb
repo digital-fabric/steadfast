@@ -10,7 +10,7 @@ class SourcifierTest < Minitest::Test
   Dir["#{SYNTAX_FIXTURES_PATH}/*.rb"].each do |fn|
     name = File.basename(fn).match(/^(.+)\.rb$/)[1]
     src = IO.read(fn)
-    define_method(:"test_sourcify_#{name}") {
+    define_method(:"test_sourcifier_#{name}") {
       proc = eval(src, binding, fn)
       node = Steadfast.to_ast(proc)
       assert_kind_of Ruby::Prism::Node, node

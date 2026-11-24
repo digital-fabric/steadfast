@@ -1,3 +1,5 @@
-proc {
-  :foo
+-> {
+  proc {
+    :foo
+  }
 }
