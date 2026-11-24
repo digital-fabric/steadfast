@@ -7,6 +7,7 @@ require 'steadfast/sourcifier'
 require 'steadfast/visitor'
 require 'steadfast/rewriter'
 require 'steadfast/make'
+require 'steadfast/quote'
 
 # Tell Ruby to keep script lines in memory, so calling Proc#syntax_tree or
 # Method#syntax_tree will work.
