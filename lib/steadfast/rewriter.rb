@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require 'steadfast/visitor'
+
 module Steadfast
 
   # The Rewriter class is used for rewriting ASTs.
-  class Rewriter
+  class Rewriter < Visitor
     # Rewrites the given AST with a either a hash of node replacements, or a
     # block which is invoked for each node in the AST.
     #
@@ -18,23 +20,7 @@ module Steadfast
           replacements.key?(n) ? replacements[n] : n
         end
       end
-      ast.accept(new(rewrite_block))
-    end
-
-    # Initializes the rewriter.
-    #
-    # @param rewrite_block [Proc]
-    # @return [void]
-    def initialize(rewrite_block)
-      @rewrite_block = rewrite_block
-    end
-
-    # Intercepts visit_xxxx method calls.
-    #
-    # @param sym [Symbol]
-    # @return [void]
-    def method_missing(sym, *, **, &)
-      sym =~ /^visit_/ ? visit(*) : super(sym, *, **, &)
+      ast.accept(new(&rewrite_block))
     end
 
     # Visits the given node, and subsequently its subnodes, invoking the rewrite
@@ -43,7 +29,7 @@ module Steadfast
     # @param n [Ruby::Prism::Node]
     # @return [Ruby::Prism::Node]
     def visit(n)
-      n2 = @rewrite_block.(n, &@rewrite_block)
+      n2 = @block.(n, &@block)
       return n2 if n2 != n
 
       changes = {}
