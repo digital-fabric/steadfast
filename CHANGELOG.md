@@ -1,3 +1,8 @@
+# 0.2.0 2026-11-24
+
+- Use frozen string literals in `eval_ast`
+- Refactor source mapping into separate module
+
 # 0.1.0 2026-11-23
 
 - Improve source mapping, make it work for derivative synthetic ASTs
