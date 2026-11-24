@@ -207,3 +207,8 @@ I've also published a blog post describing the work done.
 - [v] Add tests to verify that source mapping works correctly for synthetic ASTs.
 - [ ] Work on tools for generating arbitrary AST nodes.
 
+# 2026-11-24
+
+- [v] Use frozen string literals in generated code
+- [v] Implement `Visitor` class for visiting ASTs with a block
+- [v] Implement `walk`, `find`, `find_all` tools
