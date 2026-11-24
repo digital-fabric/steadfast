@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'steadfast/source_mapping'
 require 'steadfast/sourcifier'
 require 'steadfast/rewriter'
 
@@ -24,39 +25,6 @@ module Steadfast
   end
 
   class << self
-    # Returns the global Steadfast source map hash. Currently *not* thread-safe.
-    #
-    # @return [Hash] source map
-    def sourcemap
-      @sourcemap ||= {}
-    end
-
-    # Translates entries in the given backtrace according to the global source
-    # map.
-    #
-    # @param bt [Array<String>] backtrace
-    # @return [Array<String>] translated source map
-    def translate_backtrace(bt)
-      bt.map {
-        if (m = it.match(/^(.+)(\:in.+)$/)) && (loc = find_sourcemap_entry(m[1]))
-          "#{loc}#{m[2]}"
-        else
-          it
-        end
-      }
-    end
-
-    # Returns a mapped location for the given location entry.
-    #
-    # @param loc [String] location string of the form file:line
-    # @return [String, nil] mapped location
-    def find_sourcemap_entry(loc)
-      loc = sourcemap[loc]
-      return nil if !loc
-
-      (loc =~ /^\(steadfast-[0-9a-f]+\)\:\d+$/) ? find_sourcemap_entry(loc) : loc
-    end
-
     # Returns an AST for the given object.
     #
     # @param obj [Proc, Method, UnboundedMethod, Ruby::Prism::Node]

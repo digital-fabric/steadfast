@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Steadfast
+
   # The Rewriter class is used for rewriting ASTs.
   class Rewriter
     # Rewrites the given AST with a either a hash of node replacements, or a

@@ -2108,7 +2108,7 @@ So, maybe we can have a `Steadfast.specialize` method, such that:
 ```ruby
 template = ->(foo) {
   if foo
-    div "foo"
+    div foo
   else
     div "bar"
   end
@@ -2170,4 +2170,3 @@ def Steadfast.specialize(l, values, &block)
   }
 end
 ```
-

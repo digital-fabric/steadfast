@@ -185,21 +185,21 @@ class SourcifierSourceMapTest < Minitest::Test
 
     e = catch_error { l.(1) }
     assert_kind_of E1, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE, line
 
     e = catch_error { l.(2) }
     assert_kind_of E2, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E2_LINE, line
 
     e = catch_error { l.(3) }
     assert_kind_of E3, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E3_LINE, line
@@ -210,14 +210,14 @@ class SourcifierSourceMapTest < Minitest::Test
 
     e = catch_error { l.(2) }
     assert_kind_of E2, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E2_LINE, line
 
     e = catch_error { l.(3) }
     assert_kind_of E3, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E3_LINE, line
@@ -259,21 +259,21 @@ class SourcifierSourceMapTest < Minitest::Test
 
     e = catch_error { l.(1) }
     assert_kind_of E1, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE, line
 
     e = catch_error { l.(2) }
     assert_kind_of E2, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE + 1, line
 
     e = catch_error { l.(3) }
     assert_kind_of E3, e
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     filename, line = bt_entry_location(bt.first)
     assert_equal __FILE__, filename
     assert_equal E1_LINE + 3, line

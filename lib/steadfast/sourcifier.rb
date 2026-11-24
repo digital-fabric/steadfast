@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'steadfast/source_mapping'
+
 module Steadfast
 
   # A Sourcifier is used for converting an AST to source code. Sourcifier is
@@ -691,9 +693,13 @@ module Steadfast
 
       if (filename = source.__filename__) && (filename || last_source.__filename__)
         emit_newline if different_source && last_source
-        Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{filename}:#{loc.start_line}"
+        Steadfast::SourceMapping.set(
+          @filename, @line, filename, loc.start_line
+        )
       elsif filename.nil? && @last_loc
-        Steadfast.sourcemap["#{@filename}:#{@line}"] ||= "#{last_source.__filename__}:#{@last_loc.start_line}"
+        Steadfast::SourceMapping.set(
+          @filename, @line, last_source.__filename__, @last_loc.start_line
+        )
       end
     end
 

@@ -302,21 +302,21 @@ class SyntheticASTSourceMappingTest < Minitest::Test
     e = capture_exception { l2.(1) }
     assert_kind_of RuntimeError, e
     assert_equal 'foo', e.message
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     assert_equal [__FILE__, lines[:foo]], bt_entry_location(bt[0])
     assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
 
     e = capture_exception { l2.(2) }
     assert_kind_of RuntimeError, e
     assert_equal 'bar', e.message
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     assert_equal [__FILE__, lines[:bar]], bt_entry_location(bt[0])
     assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
 
     e = capture_exception { l2.(3) }
     assert_kind_of RuntimeError, e
     assert_equal 'baz', e.message
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     assert_equal [__FILE__, lines[:baz]], bt_entry_location(bt[0])
     assert_equal [__FILE__, __LINE__ - 5], bt_entry_location(bt[1])
   end
@@ -379,7 +379,7 @@ class SyntheticASTSourceMappingTest < Minitest::Test
     e = capture_exception { l3.(1) }
     assert_kind_of RuntimeError, e
     assert_equal 'foo', e.message
-    bt = Steadfast.translate_backtrace(e.backtrace)
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
     assert_equal [__FILE__, lines[:foo]], bt_entry_location(bt[0])
     assert_equal [__FILE__, l_body_line], bt_entry_location(bt[1])
     assert_equal [__FILE__, l_body_line], bt_entry_location(bt[2])
