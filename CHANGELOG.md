@@ -1,3 +1,10 @@
+# 0.3.0 2026-11-24
+
+- Implement `Steadfast.find_all`
+- Implement `Steadfast.find`
+- Implement `Steadfast.walk`
+- Add `Visitor` base class, base `Rewriter` off it
+
 # 0.2.0 2026-11-24
 
 - Use frozen string literals in `eval_ast`
