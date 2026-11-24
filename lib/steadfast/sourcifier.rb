@@ -89,6 +89,7 @@ module Steadfast
       optional_keyword_parameter: [:name_loc, :whitespace, :value],
       or:                         [:left, :whitespace, :operator_loc, :whitespace, :right],
       parentheses:                [:opening_loc, :body, :closing_loc],
+      program:                    :emit_verbatim,
       pinned_expression:          [:operator_loc, :lparen_loc, :expression, :rparen_loc],
       pinned_variable:            [:operator_loc, :variable],
       rational:                   :emit_verbatim,
