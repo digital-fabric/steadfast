@@ -27,5 +27,10 @@ module Minitest::Assertions
 
   def format_src(src)
     SyntaxTree.format(src).gsub(/\n{2,}/m, "\n")
+  rescue SyntaxTree::Parser::ParseError => e
+    puts '*' * 40
+    puts e.message
+    puts src
+    exit!(1)
   end
 end
