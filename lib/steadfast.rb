@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
+require 'securerandom'
+
 require 'steadfast/source_mapping'
 require 'steadfast/sourcifier'
 require 'steadfast/visitor'
 require 'steadfast/rewriter'
+require 'steadfast/make'
 
 # Tell Ruby to keep script lines in memory, so calling Proc#syntax_tree or
 # Method#syntax_tree will work.
@@ -26,6 +29,8 @@ module Steadfast
   end
 
   class << self
+    include Steadfast::Make
+
     # Returns an AST for the given object.
     #
     # @param obj [Proc, Method, UnboundedMethod, Ruby::Prism::Node]
