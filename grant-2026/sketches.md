@@ -2170,3 +2170,96 @@ def Steadfast.specialize(l, values, &block)
   }
 end
 ```
+
+# 2026-11-24
+
+## Synthesizing AST Nodes
+
+Writing the rewrite tests has been a learning experience. Especially evolving
+from using `eval` to invoking `Prism.parse`:
+
+```ruby
+def make_loop(body_node, statements)
+  loc = source_location(body_node)
+  loop_node = Ruby::Prism.parse(
+    'loop do; 1; end', filepath: loc[0], line: loc[1]
+  ).value.statements.body[0]
+  loop_node.send(:source).__filename__ = loc[0]
+
+  loop_block_body = loop_node.block.body
+  Steadfast.rewrite(loop_node, loop_block_body => { body: statements })
+end
+```
+
+What we can extract from here is that when synthesizing a node, we can take an
+original node which provides the source location, and feed that into the call to
+`Prism.parse`. We can also provide additional options to improve parsing, e.g.
+frozen_string_literal:
+
+https://docs.ruby-lang.org/en/master/Ruby/Prism.html#method-c-parse
+
+```ruby
+# @param obj [P::Node, P::Location]
+# @return [Array] [filename, lineno]
+def get_source_location(obj)
+  filename = obj.send(:source).__filename__ || raise('No filename set')
+  lineno = obj.start_line
+  [filename, lineno]
+end
+
+# @param src [String]
+# @param loc [P::Node, P::Location]
+# @param lvars [Array<Symbol>] optional local var list
+# @param binding [Binding] optional binding
+# @return [P::Node]
+def make_node(src, loc: nil, lvars: nil, binding: nil)
+  loc = orig_node && get_source_location(orig_node)
+  scopes = [(binding&.local_variables || []), lvars].compact
+  opts = {
+    raise_error:            true,
+    freeze:                 true,
+    frozen_string_literal:  true,
+    filepath:               loc && loc[0],
+    line:                   loc && loc[1],
+    scopes:                 scopes
+  }
+  Prism.parse(src, **opts).value.statements.body[0]
+end
+```
+
+## Testing make_node
+
+1. 100% synthetic AST, building the following:
+
+  ```ruby
+  ->(x) {
+    loop {
+      if x
+        break 42
+      else
+        raise 'foo'
+      end
+    }
+  }
+  ```
+
+2. Test lvars, binding
+
+3. Test source location - in conjunction with Steadfast.rewrite
+
+  ```ruby
+  # take this
+  ->(x) {
+    case x
+    when 1
+      foo
+    when 2
+      bar
+    end
+  }
+  ```
+
+  - Replace foo with synthetic `rescue 'foo'`, bar with `rescue 'bar'`
+  - Use `eval_ast` to do source mapping
+  - Check backtrace translation
+

@@ -70,12 +70,22 @@ module Steadfast
 
       case source_location
       when nil
+        # Important: ideally we'd set the source location line no to 0 (to
+        # compensate for the #frozen_string_literal comment at the top).
+        # However, while `eval` respects a starting lineno set to 0, Prism does
+        # not, which can lead to off-by-one line nos in exception backtraces for
+        # synthetic ASTs.
+        # 
+        # Note that when source_location is not nil, we do decrement the start
+        # lineno. Hopefully some day this wart will be removed from Ruby.G
         source_location = ["(steadfast-#{SecureRandom.hex(4)})", 1]
       when :caller
         l = caller_locations[0]
-        source_location = [l.path, l.lineno]
+        source_location = [l.path, l.lineno - 1]
+      else
+        source_location = [source_location[0], source_location[1] - 1]
       end
-      src = to_source(ast, source_location:, sourcemap: true)
+      src = to_source(ast, source_location:, sourcemap: true, frozen_string_literal: true)
       if eval_receiver
         eval_receiver.instance_eval(src)
       else

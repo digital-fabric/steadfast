@@ -65,6 +65,15 @@ class EvalASTTest < Minitest::Test
     assert_equal 42, l2.()
     loc = l2.source_location
     assert_match /^\(steadfast-[0-9a-f]+\)$/, loc[0]
-    assert_equal 1, loc[1]
+    assert_equal 2, loc[1]
+  end
+
+  def test_eval_ast_frozen_string_literal
+    l1 = -> { "foo" }
+    ast = Steadfast.to_ast(l1)
+    l2 = Steadfast.eval_ast(ast)
+
+    s = l2.()
+    assert_equal true, s.frozen?
   end
 end

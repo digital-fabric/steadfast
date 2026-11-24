@@ -119,10 +119,11 @@ module Steadfast
     #
     # @param start_line []
     # @return [void]
-    def initialize(source_location: nil, sourcemap: false)
+    def initialize(source_location: nil, sourcemap: false, frozen_string_literal: false)
       @filename, @line = source_location
       @line ||= 1
       @sourcemap = sourcemap
+      @frozen_string_literal = frozen_string_literal
 
       raise Steadfast::Error, "No filename given, can't generate source map" if @sourcemap && !@filename
     end
@@ -133,6 +134,10 @@ module Steadfast
     # @return [String] source code
     def to_source(ast)
       @buffer = +''
+      if @frozen_string_literal
+        @buffer << "#frozen_string_literal: true\n"
+        @line += 1
+      end
       visit(ast)
       @buffer
     end
