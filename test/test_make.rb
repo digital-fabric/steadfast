@@ -182,6 +182,11 @@ class MakeDefTest < Minitest::Test
     make_def('ù', body: nil)
     make_def('zλ', body: nil)
   end
+
+  def test_steadfast_make_def
+    n = Steadfast.make_def('foo', body: nil)
+    assert_kind_of Ruby::Prism::DefNode, n
+  end
 end
 
 class MakeLVarReadTest < Minitest::Test
@@ -193,7 +198,7 @@ class MakeLVarReadTest < Minitest::Test
     assert_equal :foo, n.name
   end
 
-  def test_make_lvar_read_node_invalid_name
+  def test_make_lvar_read_invalid_name
     assert_raises(SyntaxError) { make_lvar_read(1) }
     assert_raises(SyntaxError) { make_lvar_read(nil) }
     assert_raises(SyntaxError) { make_lvar_read(true) }
@@ -203,5 +208,10 @@ class MakeLVarReadTest < Minitest::Test
     assert_raises(SyntaxError) { make_lvar_read('a);')}
 
     %w[_é _ù ù λ].each { make_lvar_read(it) }
+  end
+
+  def test_steadfast_make_lvar_read
+    n = Steadfast.make_lvar_read(:foo)
+    assert_kind_of Ruby::Prism::LocalVariableReadNode, n
   end
 end

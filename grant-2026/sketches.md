@@ -2321,3 +2321,6 @@ be included anywhere), *and* included in the `Steadfast` singleton class.
 
 ## Query Selector Syntax for Finding a Node in an AST
 
+```ruby
+Steadfast.query(ast) { call(name: :loop) }
+```
