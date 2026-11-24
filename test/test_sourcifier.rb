@@ -63,7 +63,7 @@ class SourcifierPrismTest < Minitest::Test
   Dir["#{PRISM_FIXTURES_PATH}/*.txt"].each do |fn|
     name = File.basename(fn).match(/^(.+)\.txt$/)[1]
     src = IO.read(fn)
-    define_method(:"test_sourcify_prism_#{name}") {
+    define_method(:"test_sourcifier_prism_#{name}") {
       proc = eval(src, binding, fn)
       node = Steadfast.to_ast(proc)
       assert_kind_of Ruby::Prism::Node, node
