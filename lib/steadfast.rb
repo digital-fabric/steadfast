@@ -93,7 +93,7 @@ module Steadfast
       end
       src = to_source(ast, source_location:, sourcemap: true, frozen_string_literal: true)
       if eval_receiver
-        eval_receiver.instance_eval(src)
+        eval_receiver.instance_eval(src, source_location[0], source_location[1])
       else
         eval(src, eval_binding || binding, source_location[0], source_location[1])
       end

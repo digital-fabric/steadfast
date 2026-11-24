@@ -2263,3 +2263,61 @@ end
   - Use `eval_ast` to do source mapping
   - Check backtrace translation
 
+## The node making API
+
+Some possibilities:
+
+```ruby
+# a make class
+Steadfast::Make.lvar_read(:foo)
+Steadfast::Make.loop(statements)
+Steadfast::Make.raise(FooError, 'foo')
+
+# a make module
+include Steadfast::Nodes
+make_lvar_read(:foo)
+make_loop(statements)
+make_raise(FooError, 'foo')
+
+# a __ accessor
+Steadfast.__.lvar_read(:foo)
+Steadfast.__.loop(statements)
+Steadfast.__.raise(FooError, 'foo')
+
+# a maker accessor
+Steadfast.maker.lvar_read(:foo)
+Steadfast.maker.loop(statements)
+Steadfast.maker.raise(FooError, 'foo')
+
+# Direct singleton methods on Steadfast
+Steadfast.make_lvar_read(:foo)
+Steadfast.make_loop(statements)
+Steadfast.make_raise(FooError, 'foo')
+```
+
+We also need to take into account the fact that we also need to provide a
+similar API for generating nodes inside `quote`:
+
+```ruby
+Steadfast.quote {
+  __.lvar_read(unquote(:foo))
+  __.call(unquote(:loop), &unquote(statements)) # which we may also express as:
+  __.loop(&unquote(statements))
+  __.raise(FooError, unquote(msg)) # this is also a helper function actually
+}
+```
+
+Those synthetic nodes inside a quote block carry their own location, which we
+can pass to the normal node making API, as follows:
+
+```ruby
+Steadfast.make_lvar_read(name, location: node)
+```
+
+So, all node making methods take an optional `location:` kwarg.
+
+For the time being, we'll implement the node making API on a `Make` module (can
+be included anywhere), *and* included in the `Steadfast` singleton class.
+
+## Query Selector Syntax for Finding a Node in an AST
+
