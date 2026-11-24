@@ -2,6 +2,7 @@
 
 require 'steadfast/source_mapping'
 require 'steadfast/sourcifier'
+require 'steadfast/visitor'
 require 'steadfast/rewriter'
 
 # Tell Ruby to keep script lines in memory, so calling Proc#syntax_tree or
@@ -91,6 +92,22 @@ module Steadfast
       else
         eval(src, eval_binding || binding, source_location[0], source_location[1])
       end
+    end
+
+    def walk(ast, &)
+      ast.accept(Visitor.new(&))
+      ast
+    end
+
+    def find(ast, &block)
+      ast.accept(Visitor.new { return it if block.(it) })
+      nil
+    end
+
+    def find_all(ast, &block)
+      nodes = []
+      ast.accept(Visitor.new { nodes << it if block.(it) })
+      nodes
     end
 
     private

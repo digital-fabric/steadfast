@@ -77,3 +77,56 @@ class EvalASTTest < Minitest::Test
     assert_equal true, s.frozen?
   end
 end
+
+class WalkTest < Minitest::Test
+  P = Ruby::Prism
+
+  def test_walk
+    l = -> { loop { 42; :foo } }
+    ast = Steadfast.to_ast(l)
+
+    buf = []
+    Steadfast.walk(ast) { buf << it.class }
+    assert_equal [
+      P::LambdaNode,
+      P::StatementsNode,
+      P::CallNode,
+      P::BlockNode,
+      P::StatementsNode,
+      P::IntegerNode,
+      P::SymbolNode
+    ], buf
+  end
+end
+
+class FindTest < Minitest::Test
+  def test_find
+    l = -> { loop { 42; :foo } }
+    ast = Steadfast.to_ast(l)
+
+    n = Steadfast.find(ast) { it in Ruby::Prism::StringNode }
+    assert_nil n
+
+    n = Steadfast.find(ast) { it in Ruby::Prism::SymbolNode }
+    assert(n.is_a?(Ruby::Prism::SymbolNode) && n.unescaped == 'foo')
+  end
+end
+
+class FindAllTest < Minitest::Test
+  def test_find_all
+    l = -> { loop { 42; :foo; :bar } }
+    ast = Steadfast.to_ast(l)
+
+    nn = Steadfast.find_all(ast) { it in Ruby::Prism::StatementsNode }
+    assert_kind_of Array, nn
+    assert_equal 2, nn.size
+
+    nn = Steadfast.find_all(ast) { it in Ruby::Prism::StringNode }
+    assert_kind_of Array, nn
+    assert_equal 0, nn.size
+
+    nn = Steadfast.find_all(ast) { it in Ruby::Prism::SymbolNode }
+    assert_kind_of Array, nn
+    assert_equal %w[foo bar], nn.map(&:unescaped)
+  end
+end
