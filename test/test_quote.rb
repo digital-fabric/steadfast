@@ -97,7 +97,7 @@ class QuoteTest < Minitest::Test
     assert_raises(ArgumentError) { quote { unquote() } }
   end
 
-  def test_quote_unquote_ast
+  def test_quote_unquote_node
     n = quote(binding) { unquote { Steadfast.make_literal([1]) } }
     assert_kind_of Ruby::Prism::ArrayNode, n
     assert_equal [1], Steadfast.eval_ast(n)
@@ -107,6 +107,13 @@ class QuoteTest < Minitest::Test
     assert_kind_of Ruby::Prism::LambdaNode, n
     l2 = Steadfast.eval_ast(n)
     assert_equal 9, l2.(3)
+  end
+
+  def test_quote_unquote_array_of_nodes
+    a = [42, 43].map { Steadfast.make_literal(it) }
+    n = quote(binding) { unquote(a) }
+    assert_kind_of Ruby::Prism::StatementsNode, n
+    assert_source_match "42; 43", Steadfast.to_source(n)
   end
 end
 
@@ -125,5 +132,70 @@ class UnquoteTest < Minitest::Test
     n = unquote(Steadfast.to_ast(->() { 42 }))
     assert_kind_of Ruby::Prism::LambdaNode, n
     assert_equal 42, Steadfast.eval_ast(n).()
+  end
+end
+
+class QuoteScenarioAdder < Minitest::Test
+  include Steadfast::Quote
+
+  def make_adder(v)
+    ast = quote(binding) { ->(x) { x + unquote(v) } }
+    Steadfast.eval_ast(ast)
+  end
+
+  def test_quote_scenario_adder
+    a = make_adder(42)
+    assert_kind_of Proc, a
+    assert_equal 47, a.(5)
+  end
+end
+
+class QuoteScenarioValidator < Minitest::Test
+  include Steadfast::Quote
+  
+  def create_validator(*conds)
+    @raise_line = __LINE__ + 3
+    ast = quote(binding) {
+      ->(v) {
+        unquote(conds.map { |c| quote { raise unless unquote(c) === v } })
+        v
+      }
+    }
+    Steadfast.eval_ast(ast)
+  rescue => e
+    p e
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
+    bt.each { puts it }
+    exit!(1)
+  end
+
+  def capture_exception
+    yield
+    nil
+  rescue => e
+    e
+  end
+
+  def bt_entry_location(entry)
+    if (m = entry.match(/^([^\:]+)\:(\d+)/))
+      [m[1], m[2].to_i]
+    else
+      nil
+    end
+  end
+
+  def test_quote_scenario_validator
+    v = create_validator(String, /abc/)
+    assert_kind_of Proc, v
+    assert_equal 'abc', v.('abc')
+    assert_raises(RuntimeError) { v.(1) }
+    assert_raises(RuntimeError) { v.('def') }
+
+    call_line = __LINE__ + 1
+    e = capture_exception { v.('Abc') }
+    assert_kind_of RuntimeError, e
+    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
+    assert_equal [__FILE__, @raise_line], bt_entry_location(bt[0])
+    assert_equal [__FILE__, call_line], bt_entry_location(bt[1])
   end
 end
