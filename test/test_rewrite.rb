@@ -4,6 +4,19 @@ require_relative './helper'
 require 'securerandom'
 
 class RewriteTest < Minitest::Test
+  def test_rewrite_no_replacement
+    l = ->() { 42 }
+    ast = Steadfast.to_ast(l)
+    ast2 = Steadfast.rewrite(ast)
+    assert_equal ast2, ast
+  end
+  
+  def test_rewrite_invalid_ast
+    assert_raises(ArgumentError) { Steadfast.rewrite(nil) }
+    assert_raises(ArgumentError) { Steadfast.rewrite(1) }
+    assert_raises(ArgumentError) { Steadfast.rewrite(->() { 42 }) }
+  end
+  
   def test_rewrite_replacements_node_to_node
     l1 = -> { 1 }
     l2 = -> { :foo }
