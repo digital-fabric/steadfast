@@ -31,7 +31,15 @@ module Steadfast
     def quote(binding, &block)
       raise Steadfast::Error, "No block given" if !block
 
-      ast = Steadfast.to_ast(block).block
+      ast = Steadfast.to_ast(block)
+      p ast.class
+      if ast.is_a?(Ruby::Prism::CallNode)
+        p 1
+        ast = ast.block
+      else
+        p 2
+        ast = ast.block
+      end
       quoted = Steadfast.rewrite(ast) { |n| __quote_rewrite__(n, binding) }
       if quoted.is_a?(Ruby::Prism::BlockNode)
         statements = quoted.body
