@@ -216,8 +216,8 @@ module Steadfast
       if (ml = node.message_loc)
         ol = node.opening_loc
         emit_message_loc = !ol || (ol.start_line != ml.start_line) || (ol.start_column != ml.start_column)
-        emit_whitespace if node.name =~ /^\+|\-|\*|\/|\&|\|\*\*|\&\&|\|\||\%$/
-        emit_code(node.message_loc) if emit_message_loc
+        emit_whitespace if node.name =~ /^\+|\-|\*|\/|\&|\|\*\*|\&\&|\|\||\%|={2,3}$/
+        emit_code(node.message_loc, inhibit_new_line: true) if emit_message_loc
       end
       emit_code(node.opening_loc)
       emit_whitespace if !node.opening_loc && node.arguments
@@ -679,11 +679,11 @@ module Steadfast
     #
     # @param loc [Ruby::Prism::Location, Ruby::Prism::Node, nil]
     # @return [void]
-    def emit_code(loc)
+    def emit_code(loc, inhibit_new_line: false)
       return if !loc
       return visit(loc) if loc.is_a?(Ruby::Prism::Node)
 
-      record_loc_source_mapping(loc) if @sourcemap
+      record_loc_source_mapping(loc, inhibit_new_line:) if @sourcemap
       emit(loc.slice.chomp)
     end
 
@@ -694,7 +694,8 @@ module Steadfast
     #
     # @param loc [Ruby::Prism::Location] code location
     # @return [void]
-    def record_loc_source_mapping(loc)
+    def record_loc_source_mapping(loc, inhibit_new_line:)
+      last_loc = loc
       source = loc.send(:source)
       last_source = @last_loc&.send(:source)
       different_source = source.__filename__ && source != last_source
@@ -703,7 +704,7 @@ module Steadfast
       return if !changed
 
       if (filename = source.__filename__) && (filename || last_source.__filename__)
-        emit_newline if different_source && last_source
+        emit_newline if !inhibit_new_line && different_source && last_source
         Steadfast::SourceMapping.set(
           @filename, @line, filename, loc.start_line
         )
