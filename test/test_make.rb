@@ -290,3 +290,21 @@ class MakeLiteralTest < Minitest::Test
     assert_equal Steadfast::Make, Steadfast.eval_ast(n)
   end
 end
+
+class MakeConstantTest < Minitest::Test
+  include Steadfast::Make
+
+  ABC = 42
+
+  def test_make_constant
+    n = make_constant('ABC')
+    assert_kind_of Ruby::Prism::ConstantReadNode, n
+    assert_equal 42, Steadfast.eval_ast(n, self)
+  end
+
+  def test_make_constant_invalid_name
+    assert_raises(SyntaxError) { make_constant('abc') }
+    assert_raises(SyntaxError) { make_constant('1QD') }
+    assert_raises(SyntaxError) { make_constant('A D') }
+  end
+end
