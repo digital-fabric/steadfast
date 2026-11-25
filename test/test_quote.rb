@@ -9,37 +9,37 @@ class QuoteTest < Minitest::Test
   def bar(x); [x]; end
 
   def test_quote_no_unquote
-    n = quote { 1 }
+    n = quote(nil) { 1 }
     assert_kind_of Ruby::Prism::IntegerNode, n
     assert_equal 1, Steadfast.eval_ast(n)
 
-    n = quote { true }
+    n = quote(nil) { true }
     assert_kind_of Ruby::Prism::TrueNode, n
     assert_equal true, Steadfast.eval_ast(n)
 
-    n = quote { nil }
+    n = quote(nil) { nil }
     assert_kind_of Ruby::Prism::NilNode, n
     assert_nil Steadfast.eval_ast(n)
 
-    n = quote { [1] }
+    n = quote(nil) { [1] }
     assert_kind_of Ruby::Prism::ArrayNode, n
     assert_equal [1], Steadfast.eval_ast(n)
 
-    n = quote { 'abc' }
+    n = quote(nil) { 'abc' }
     assert_kind_of Ruby::Prism::StringNode, n
     assert_equal 'abc', Steadfast.eval_ast(n)
 
-    n = quote { "abc#{'def'}" }
+    n = quote(nil) { "abc#{'def'}" }
     assert_kind_of Ruby::Prism::InterpolatedStringNode, n
     assert_equal 'abcdef', Steadfast.eval_ast(n)
 
-    n = quote { foo }
+    n = quote(nil) { foo }
     assert_kind_of Ruby::Prism::CallNode, n
     assert_equal :foo, Steadfast.eval_ast(n, self)
   end
 
   def test_quote_no_unquote_multiple_statements
-    n = quote { 1; :foo }
+    n = quote(nil) { 1; :foo }
     assert_kind_of Ruby::Prism::StatementsNode, n
     assert_equal "1\n:foo", Steadfast.to_source(n)
   end
@@ -92,9 +92,9 @@ class QuoteTest < Minitest::Test
   end
 
   def test_quote_unquote_invalid_args
-    assert_raises(ArgumentError) { quote { unquote(1, 2) } }
-    assert_raises(ArgumentError) { quote { unquote(1) { 2 } } }
-    assert_raises(ArgumentError) { quote { unquote() } }
+    assert_raises(ArgumentError) { quote(nil) { unquote(1, 2) } }
+    assert_raises(ArgumentError) { quote(nil) { unquote(1) { 2 } } }
+    assert_raises(ArgumentError) { quote(nil) { unquote() } }
   end
 
   def test_quote_unquote_node

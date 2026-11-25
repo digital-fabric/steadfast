@@ -1,14 +1,34 @@
 # frozen_string_literal: true
 
-require 'debug_inspector'
-
 module Steadfast
   module Quote
     extend self
 
-    # @param binding [Binding] unquote binding
+    # Quotes the code in the given block, interpolating all unquote expressions.
+    # Returns the resulting AST. The unquote call is used to perform a
+    # computation at the time of building the AST. The result of unquote is an
+    # object that can be literalized, that is premitive values: true, false,
+    # nil, and instances of Integer, Symbol, String, Regexp, Array, Hash, Module
+    # and Class. an unquote can also compute an AST and it will be embedded in
+    # place. In order to be able to unquote local and instance variables, the
+    # local binding must be provided. 
+    # 
+    # Example:
+    # 
+    #     i = 4
+    #     ast = Steadfast.quote(binding) { ->(x) { unquote(i) + x } }
+    #     l = Steadfast.eval_ast(ast) #=> ->(x) { 4 + x }
+    #     l + 3 #=> 7
+    #
+    # An call to unquote can also be in the form of a block, if the computation
+    # consists of more than one statement:
+    # 
+    #     ast = Steadfast.quote(binding) {
+    # }
+    # 
+    # @param binding [Binding, nil] unquote binding
     # @return [Ruby::Prism::Node]
-    def quote(binding = nil, &block)
+    def quote(binding, &block)
       raise Steadfast::Error, "No block given" if !block
 
       ast = Steadfast.to_ast(block).block
@@ -30,12 +50,6 @@ module Steadfast
     
     private
 
-    def __quote_caller_binding__(idx = 3)
-      DebugInspector.open { # frame 2
-        it.frame_binding(idx) #frame 1
-      }
-    end
-
     def __quote_rewrite__(n, binding)
       case n
       in Ruby::Prism::CallNode(receiver: nil, name: :unquote)
@@ -47,6 +61,7 @@ module Steadfast
 
     def __quote_rewrite_unquote__(n, binding)
       if n.arguments && (n.arguments.arguments.size == 1) && !n.block
+        # 
         arg = __quote_rewrite_unquote_expr__(n.arguments.arguments[0], binding)
         v = Steadfast.eval_ast(arg, nil, binding)
         __quote_rewrite_unquote_convert_value__(v, n)
