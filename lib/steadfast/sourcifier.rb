@@ -18,7 +18,6 @@ module Steadfast
       alias_global_variable:      [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
       alias_method:               [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
       and:                        [:left, :whitespace, :operator_loc, :whitespace, :right],
-      assoc:                      [:key, :whitespace, :operator_loc, :whitespace, :value],
       assoc_splat:                [:operator_loc, :value],
       back_reference_read:        :emit_verbatim,
       block:                      [:opening_loc, :parameters, :newline, :body, :newline, :closing_loc],
@@ -172,6 +171,12 @@ module Steadfast
 
     def visit_arguments_node(node, subscript = 0..-1)
       visit_comma_separated_nodes(node.arguments[subscript])
+    end
+
+    def visit_assoc_node(node)
+      emit_code(node.key)
+      node.operator_loc ? emit(' => ') : emit_whitespace
+      emit_code(node.value)
     end
 
     def visit_begin_node(node)
