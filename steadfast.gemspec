@@ -20,7 +20,6 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.required_ruby_version = '>= 4.0'
 
-  s.add_runtime_dependency      'debug_inspector'
   s.add_development_dependency  'minitest'
   s.add_development_dependency  'irb'
   s.add_development_dependency  'syntax_tree', '6.3.0'

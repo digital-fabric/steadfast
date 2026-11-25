@@ -104,16 +104,30 @@ module Steadfast
       end
     end
 
+    # Visits the given AST, passing each node in the AST to the given block.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @return [void]
     def walk(ast, &)
       ast.accept(Visitor.new(&))
       ast
     end
 
+    # Visits the given AST, passing each node in the AST to the given block.
+    # Returns the first node for which the block returns true.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @return [Ruby::Prism::Node, nil]
     def find(ast, &block)
       ast.accept(Visitor.new { return it if block.(it) })
       nil
     end
 
+    # Visits the given AST, passing each node in the AST to the given block.
+    # Returns all nodes for which the block returns true.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @return [Array<Ruby::Prism::Node>]
     def find_all(ast, &block)
       nodes = []
       ast.accept(Visitor.new { nodes << it if block.(it) })
