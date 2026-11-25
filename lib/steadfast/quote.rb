@@ -33,22 +33,28 @@ module Steadfast
 
       ast = Steadfast.to_ast(block)
       if ast.is_a?(Ruby::Prism::CallNode)
-        ast = ast.block
+        ast = ast.block.body
       elsif ast.is_a?(Ruby::Prism::BlockNode)
         ast = ast.body
       else
         raise Steadfast::Error, "Block can't be quoted"
       end
       quoted = Steadfast.rewrite(ast) { |n| __quote_rewrite__(n, binding) }
-      if quoted.is_a?(Ruby::Prism::BlockNode)
-        statements = quoted.body
-        if statements.body.size == 1
-          return statements.body[0]
-        else
-          return statements
-        end
+      __quote_select_returned_value__(quoted)
+    end
+
+    def __quote_select_returned_value__(ast)
+      case ast
+      when Ruby::Prism::StatementsNode
+        statements = ast
+      when Ruby::Prism::BlockNode
+        statements = ast.body
+      when Ruby::Prism::CallNode
+        statements = ast.block.body
+      else
+        return ast
       end
-      quoted
+      (statements.body.size == 1) ? statements.body[0] :  statements
     end
 
     def unquote(value, location = nil)
