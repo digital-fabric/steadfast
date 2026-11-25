@@ -3,6 +3,28 @@
 require_relative './helper'
 require 'securerandom'
 
+class ToAstTest < Minitest::Test
+  def test_to_ast_bad_block
+    l = ->(&b) { b }
+    b = l.(&:foo)
+    assert_raises(Steadfast::Error) { Steadfast.to_ast(b) }
+  end
+
+  def test_to_ast_reversibility
+    l1 = ->(x, y) { x + y }
+    ast1 = Steadfast.to_ast(l1)
+    assert_kind_of Ruby::Prism::LambdaNode, ast1
+
+    l2 = Steadfast.eval_ast(ast1)
+    assert_kind_of Proc, l2
+    assert_equal 7, l2.(3, 4)
+
+    ast2 = Steadfast.to_ast(l2)
+
+    assert_equal Steadfast.to_source(ast1), Steadfast.to_source(ast2)
+  end
+end
+
 class EvalASTTest < Minitest::Test
   def test_eval_ast_no_receiver
     x = 3

@@ -39,7 +39,11 @@ module Steadfast
     def to_ast(obj)
       case obj
       when Proc, Method, UnboundMethod
-        obj.syntax_tree.tap { set_source_filename(it, obj) }
+        ast = obj.syntax_tree
+        raise Steadfast::Error, "AST not found for given object" if !ast
+
+        set_source_filename(ast, obj)
+        ast
       when Ruby::Prism::Node
         obj
       else

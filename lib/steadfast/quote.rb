@@ -32,13 +32,12 @@ module Steadfast
       raise Steadfast::Error, "No block given" if !block
 
       ast = Steadfast.to_ast(block)
-      p ast.class
       if ast.is_a?(Ruby::Prism::CallNode)
-        p 1
         ast = ast.block
+      elsif ast.is_a?(Ruby::Prism::BlockNode)
+        ast = ast.body
       else
-        p 2
-        ast = ast.block
+        raise Steadfast::Error, "Block can't be quoted"
       end
       quoted = Steadfast.rewrite(ast) { |n| __quote_rewrite__(n, binding) }
       if quoted.is_a?(Ruby::Prism::BlockNode)
