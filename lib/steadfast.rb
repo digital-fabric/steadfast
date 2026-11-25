@@ -31,6 +31,7 @@ module Steadfast
 
   class << self
     include Steadfast::Make
+    include Steadfast::Quote
 
     # Returns an AST for the given object.
     #

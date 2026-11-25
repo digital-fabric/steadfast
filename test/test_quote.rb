@@ -199,3 +199,17 @@ class QuoteScenarioValidator < Minitest::Test
     assert_equal [__FILE__, call_line], bt_entry_location(bt[1])
   end
 end
+
+class SteadfastQuoteTest < Minitest::Test
+  def test_steadfast_quote
+    ast = Steadfast.quote(binding) { 42 }
+    assert_kind_of Ruby::Prism::IntegerNode, ast
+    assert_equal 42, Steadfast.eval_ast(ast)
+  end
+
+  def test_steadfast_unquote
+    ast = Steadfast.unquote(42)
+    assert_kind_of Ruby::Prism::IntegerNode, ast
+    assert_equal 42, Steadfast.eval_ast(ast)
+  end
+end
