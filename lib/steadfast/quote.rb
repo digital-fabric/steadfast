@@ -24,6 +24,10 @@ module Steadfast
       end
       quoted
     end
+
+    def unquote(value, location = nil)
+      __quote_rewrite_unquote_convert_value__(value, location)
+    end
     
     private
 
@@ -43,20 +47,24 @@ module Steadfast
     end
 
     def __quote_rewrite_unquote__(n, binding)
-      if n.arguments && (n.arguments.arguments.size != 1 || n.block)
-        raise ArgumentError, "Invalid unquote arguments"
-      end
-      if n.arguments
+      if n.arguments && (n.arguments.arguments.size == 1) && !n.block
         arg = n.arguments.arguments[0]
         v = Steadfast.eval_ast(arg, nil, binding)
         __quote_rewrite_unquote_convert_value__(v, n)
+      elsif n.block && !n.arguments
+        v = Steadfast.eval_ast(n.block.body, nil, binding)
+        __quote_rewrite_unquote_convert_value__(v, n)
+      else
+        raise ArgumentError, "Invalid unquote arguments"
       end
     end
 
     def __quote_rewrite_unquote_convert_value__(v, location)
       case v
-      when Integer, Float, String, Symbol, Range, Regexp, nil, true, false
-        Steadfast.make_node(v.inspect, location:)
+      when Integer, Float, String, Symbol, Range, Regexp, nil, true, false, Hash, Array
+        Steadfast.make_literal(v, location:)
+      when Ruby::Prism::Node
+        v
       else
         raise Steadfast::Error, "Don't know how to unquote #{v.inspect}"
       end

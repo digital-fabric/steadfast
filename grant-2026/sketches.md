@@ -2132,10 +2132,6 @@ there any method calls (apart from HTML tag method calls). So we might be able
 to do this with a `walk` tool:
 
 ```ruby
-Steadfast.specialize(template, foo: true) { |n, values|
-  # the block just needs to return true if the visited node is static
-}
-
 # @param l [Proc]
 # @param values [Hash]
 # @block [Proc, nil]
@@ -2323,4 +2319,218 @@ be included anywhere), *and* included in the `Steadfast` singleton class.
 
 ```ruby
 Steadfast.query(ast) { call(name: :loop) }
+```
+
+## unquote with non-literal values
+
+How do we treat stuff like `unquote(Time.now)`? Big question...
+
+# 2026-11-25
+
+## More on partial evaluation and specialization
+
+We can think of code templates, that we can then specialize. Take the first case
+from the "in-the-wild" doc. Original code:
+
+```ruby
+def infect_an_assertion meth, new_name, dont_flip = false # :nodoc:
+  block = dont_flip == :block
+  dont_flip = false if block
+
+  self.class_eval <<-EOM, __FILE__, __LINE__ + 1
+    def #{new_name}(*args, **kws)
+      raise "Calling ##{new_name} outside of test." unless ctx
+      case
+      when #{!!dont_flip} then
+        ctx.#{meth}(target, *args, **kws)
+      when #{block} && Proc === target then
+        ctx.#{meth}(*args, **kws, &target)
+      else
+        ctx.#{meth}(args.first, target, *args[1..-1], **kws)
+      end
+    end
+  EOM
+end
+
+# usage:
+infect_an_assertion :assert_empty, :must_be_empty, :unary
+```
+
+So this works is that we're calling `infect_an_assertion` in order to generate a
+method definition, according to the given arguments. We can think more in terms of a template, that can be specialized by applying arguments:
+
+```ruby
+def infect_an_assertion(meth, new_name, dont_flip = false)
+  block = dont_flip == :block
+  dont_flip = false if block
+
+  ast = Steadfast.quote(binding) {
+    __.def(unquote(new_name), *args, **kws) do
+      raise unquote("Calling #{unquote(new_name)} outside of test.") unless ctx
+      case
+      when unquote(!!dont_flip) then
+        __.call(ctx, unquote(meth), target, *args, **kws)
+      when unquote(block) && Proc === target then
+        __.call(ctx, unquote(meth), *args, **kws, &target)
+      else
+        __.call(ctx, unquote(meth), args.first, target, *args[1..-1], **kws)
+      end
+    end
+  }
+  Steadfast.eval_ast(ast, self.class, specialize: true)
+end
+```
+
+When applied with a call to:
+
+```ruby
+infect_an_assertion :assert_empty, :must_be_empty, :unary
+```
+
+We get:
+
+```ruby
+meth = :assert_empty 
+new_name = :must_be_empty
+dont_flip = :unary
+block = false
+
+def must_be_empty(*args, **kws)
+  raise unquote("Calling #{'must_be_empty'} outside of test.") unless ctx
+
+  case
+  when true then
+    ctx.assert_empty(target, *args, **kws)
+  when false && Proc === target then
+    ctx.assert_empty(*args, **kws, &target)
+  else
+    ctx.assert_empty(args.first, target, *args[1..-1], **kws)
+  end
+end
+```
+
+We can further specialize this by doing partial evaluation and pre computing
+everything that is static (doesn't include a method call, or instance var, or
+Constant lookup):
+
+```ruby
+def must_be_empty(*args, **kws)
+  # The interpolated string can be specialized
+  raise "Calling must_be_empty outside of test." unless ctx
+
+  # The case statement can also be specialized: if we can find a when condition
+  # that is static and *truthy*, we can remove all other when clauses and the
+  # else as well.
+  # 
+  # Conversly, if all when conditions are static and *not truthy*, we either
+  # remove all but the else clause, and if not else clause is present, just
+  # remove the entire case statement.
+  ctx.assert_empty(target, *args, **kws)
+end
+```
+
+Another invocation:
+
+```ruby
+infect_an_assertion :assert_kind_of, :must_be_kind_of
+
+#=> 
+
+meth = :assert_kind_of 
+new_name = :must_be_kind_of
+dont_flip = false
+block = false
+
+def must_be_empty(*args, **kws)
+  raise "Calling #{'must_be_kind_of'} outside of test." unless ctx
+
+  case
+    # dont_flip = false
+  when false then
+    ctx.assert_empty(target, *args, **kws)
+    # a call to && can be specialized if left and/or right side is static and not truthy
+  when false && Proc === target then
+    ctx.assert_empty(*args, **kws, &target)
+  else
+    ctx.assert_empty(args.first, target, *args[1..-1], **kws)
+  end
+end
+
+# specialized version:
+def must_be_kind_of(*args, **kws)
+  raise "Calling must_be_kind_of outside of test." unless ctx
+
+  ctx.assert_kind_of(args.first, target, *args[1..-1], **kws)
+end
+```
+
+So, there are actually different kinds of specializations:
+
+- static expressions (static subtrees)
+- if/unless statements
+- case statements
+- logic operator: ! (not), && (and), ||(or), ^ (xor)
+
+Partial evaluation: evaluating static expressions (continuing work from above):
+
+```ruby
+# @param ast [P::Node]
+# @return [P::Node]
+def specialize(ast)
+  Steadfast.rewrite(ast) { |n, &b|
+    case
+    when is_static_node?(n)
+      # look for any non static node in the subtree
+      next n in Steadfast.find(n) { !is_static_node?(it) }
+
+      # still here, so everything is static, we can evaluate
+      value = Steadfast.eval_ast(n)
+      next Steadfast.unquote(value)
+    when n in P::CallNode(name: :&&)
+      next specialize_and(n)
+    when n in P::CallNode(name: :||)
+      next specialize_or(n)
+    when n in P::IfNode
+      next specialize_if(n)
+    # etc...
+    else
+      n
+    end
+  }
+end
+
+def specialize_and(n)
+  left = n.receiver
+  right = n.arguments.arguments[0]
+  if (is_static_node?(left) && !is_truthy_value?(left)) ||
+      (is_static_node?(right) && !is_truthy_value?(right))
+    return Steadfast.unquote(false)
+  elsif (is_static_node?(left) && is_truthy_value?(left)) &&
+      (is_static_node?(right) && is_truthy_value?(right))
+    return Steadfast.unquote(true)
+  else
+    n
+  end
+end
+
+def specialize_if(n)
+  predicate = n.predicate
+  return n if !is_static_node?(predicate)
+
+  if is_truthy_value?(predicate)
+    return n.statements
+  elsif !is_truthy_value?(predicate)
+    subsequent = n.subsequent
+    case subsequent
+    when nil
+      return nil
+    when P::ElseNode
+      return subsequent.statements
+    when P::IfNode
+      return specialize_if(n)
+    else
+      n
+    end
+  end
+end
 ```
