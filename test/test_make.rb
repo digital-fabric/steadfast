@@ -275,4 +275,18 @@ class MakeLiteralTest < Minitest::Test
     assert_kind_of Ruby::Prism::HashNode, n
     assert_equal({ a: [1, 2, 3], b: { c: 'd' } }, Steadfast.eval_ast(n))
   end
+
+  def test_make_literal_class_module
+    n = make_literal(String)
+    assert_kind_of Ruby::Prism::ConstantReadNode, n
+    assert_equal String, Steadfast.eval_ast(n)
+
+    n = make_literal(Ruby)
+    assert_kind_of Ruby::Prism::ConstantReadNode, n
+    assert_equal Ruby, Steadfast.eval_ast(n)
+
+    n = make_literal(Steadfast::Make)
+    assert_kind_of Ruby::Prism::ConstantPathNode, n
+    assert_equal Steadfast::Make, Steadfast.eval_ast(n)
+  end
 end

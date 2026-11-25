@@ -63,7 +63,7 @@ module Steadfast
 
     def make_literal(v, location: nil)
       case v
-      when Integer, Float, String, Symbol, Range, Regexp, nil, true, false
+      when Integer, Float, String, Symbol, Range, Regexp, nil, true, false, Class, Module
         make_node(v.inspect, location:)
       when Array
         make_array(v, location:)
@@ -73,7 +73,22 @@ module Steadfast
         raise ArgumentError, "Can't make AST node for #{v.inspect}"
       end
     end
-    
+
+    def make_statements(statements, location: nil)
+      raise ArgumentError, "Not an array" if !statements.is_a?(Array)
+      raise ArgumentError, "Empty array given" if statements.size == 0
+      raise ArgumentError, "Invalid array given" if statements.any? { !it.is_a?(Ruby::Prism::Node) }
+      
+      n = make_node('(1)', location:)
+      Steadfast.rewrite(n.body, n.body => { body: statements })
+    end
+
+    def make_constant(name, location: nil)
+      raise SyntaxError, 'Invalid identifier name' if name !~ /^[A-Z][A-Za-z_\d]*$/
+
+      make_node(name.to_s, location:)
+    end
+
     private
 
     # @param location [Ruby::Prism::Node, Ruby::Prism::Location]
