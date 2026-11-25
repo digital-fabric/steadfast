@@ -37,6 +37,43 @@ module Steadfast
       make_node(name.to_s, lvars: [name.to_sym], location:)
     end
 
+    def make_array(array, location: nil)
+      raise ArgumentError, "Not an array" if !array.is_a?(Array)
+
+      n = make_node('[]', location:)
+      Steadfast.rewrite(n, n => { elements: array.map { make_literal(it, location:) } })
+    end
+
+    def make_hash(hash, location: nil)
+      raise ArgumentError, "Not a hash" if !hash.is_a?(Hash)
+
+      n = make_node('{ x => 1 }', location:)
+      assoc_node = n.elements[0]
+      elements = hash.map { |k, v|
+        Steadfast.rewrite(
+          assoc_node,
+          assoc_node => {
+            key: make_literal(k, location:),
+            value: make_literal(v, location:)
+          }
+        )
+      }
+      Steadfast.rewrite(n, n => { elements: })
+    end
+
+    def make_literal(v, location: nil)
+      case v
+      when Integer, Float, String, Symbol, Range, Regexp, nil, true, false
+        make_node(v.inspect, location:)
+      when Array
+        make_array(v, location:)
+      when Hash
+        make_hash(v, location:)
+      else
+        raise ArgumentError, "Can't make AST node for #{v.inspect}"
+      end
+    end
+    
     private
 
     # @param location [Ruby::Prism::Node, Ruby::Prism::Location]

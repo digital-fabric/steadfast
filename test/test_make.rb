@@ -215,3 +215,64 @@ class MakeLVarReadTest < Minitest::Test
     assert_kind_of Ruby::Prism::LocalVariableReadNode, n
   end
 end
+
+class MakeLiteralTest < Minitest::Test
+  include Steadfast::Make
+
+  def test_make_literal
+    n = make_literal(42)
+    assert_kind_of Ruby::Prism::IntegerNode, n
+    assert_equal 42, Steadfast.eval_ast(n)
+
+    n = make_literal(true)
+    assert_kind_of Ruby::Prism::TrueNode, n
+    assert_equal true, Steadfast.eval_ast(n)
+
+    n = make_literal(nil)
+    assert_kind_of Ruby::Prism::NilNode, n
+    assert_nil Steadfast.eval_ast(n)
+
+    n = make_literal('foo')
+    assert_kind_of Ruby::Prism::StringNode, n
+    assert_equal 'foo', Steadfast.eval_ast(n)
+
+    n = make_literal(:foo)
+    assert_kind_of Ruby::Prism::SymbolNode, n
+    assert_equal :foo, Steadfast.eval_ast(n)
+
+    n = make_literal([:foo, { bar: 'baz' }])
+    assert_kind_of Ruby::Prism::ArrayNode, n
+    assert_equal [:foo, { bar: 'baz' }], Steadfast.eval_ast(n)
+  end
+
+  def test_make_literal_array
+    n = make_array([1, 2, 3])
+    assert_kind_of Ruby::Prism::ArrayNode, n
+    assert_equal [1, 2, 3], Steadfast.eval_ast(n)
+
+    n = make_array([1, true, false, nil, 'abc', :def, /ghi/])
+    assert_kind_of Ruby::Prism::ArrayNode, n
+    assert_equal [1, true, false, nil, 'abc', :def, /ghi/], Steadfast.eval_ast(n)
+
+    n = make_array([1, ['2', 3], [[:foo, 5, [/ghi/]]]])
+    assert_kind_of Ruby::Prism::ArrayNode, n
+    assert_equal [1, ['2', 3], [[:foo, 5, [/ghi/]]]], Steadfast.eval_ast(n)
+
+    assert_raises(ArgumentError) { make_array(1) }
+    assert_raises(ArgumentError) { make_array([Object.new]) }
+  end
+
+  def test_make_literal_hash
+    n = make_hash({ 1 => 2 })
+    assert_kind_of Ruby::Prism::HashNode, n
+    assert_equal({ 1 => 2 }, Steadfast.eval_ast(n))
+
+    n = make_hash({ a: 1, b: 2 })
+    assert_kind_of Ruby::Prism::HashNode, n
+    assert_equal({ a: 1, b: 2 }, Steadfast.eval_ast(n))
+
+    n = make_hash({ a: [1, 2, 3], b: { c: 'd' } })
+    assert_kind_of Ruby::Prism::HashNode, n
+    assert_equal({ a: [1, 2, 3], b: { c: 'd' } }, Steadfast.eval_ast(n))
+  end
+end
