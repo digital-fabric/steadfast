@@ -1,3 +1,12 @@
+# 0.4.0 2026-11-25
+
+- Improve sourcifier output
+- Implement `quote` and `unquote`
+- Implement additional `make_xxx` methods
+- Implement `make_statements`
+- Implement `make_literal`
+- Implement `make_node`
+
 # 0.3.0 2026-11-24
 
 - Implement `Steadfast.find_all`

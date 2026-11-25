@@ -152,7 +152,7 @@ end
 
 class QuoteScenarioValidator < Minitest::Test
   include Steadfast::Quote
-  
+
   def create_validator(*conds)
     @raise_line = __LINE__ + 3
     ast = quote(binding) {

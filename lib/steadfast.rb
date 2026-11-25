@@ -86,7 +86,7 @@ module Steadfast
         # However, while `eval` respects a starting lineno set to 0, Prism does
         # not, which can lead to off-by-one line nos in exception backtraces for
         # synthetic ASTs.
-        # 
+        #
         # Note that when source_location is not nil, we do decrement the start
         # lineno. Hopefully some day this wart will be removed from Ruby.G
         source_location = ["(steadfast-#{SecureRandom.hex(4)})", 1]

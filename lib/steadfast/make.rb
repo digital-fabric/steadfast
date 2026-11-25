@@ -33,7 +33,7 @@ module Steadfast
     # @return [Ruby::Prism::Node]
     def make_def(name, params: nil, body:, location: nil)
       raise SyntaxError, 'Invalid method name' if !(IDENTIFIER_RE === name)
-      
+
       n = make_node("def #{name}(x); 1; end", location:)
       n.copy(body:, parameters: params)
     end
@@ -45,7 +45,7 @@ module Steadfast
     # @return [Ruby::Prism::Node]
     def make_lvar_read(name, location: nil)
       raise SyntaxError, 'Invalid identifier name' if !(IDENTIFIER_RE === name)
-      
+
       make_node(name.to_s, lvars: [name.to_sym], location:)
     end
 
@@ -110,7 +110,7 @@ module Steadfast
       raise ArgumentError, "Not an array" if !statements.is_a?(Array)
       raise ArgumentError, "Empty array given" if statements.size == 0
       raise ArgumentError, "Invalid array given" if statements.any? { !it.is_a?(Ruby::Prism::Node) }
-      
+
       n = make_node('(1)', location:)
       Steadfast.rewrite(n.body, n.body => { body: statements })
     end

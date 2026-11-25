@@ -12,9 +12,9 @@ module Steadfast
     # object that can be literalized (See #unquote). A call to unquote can also
     # be used to inject an AST into the code. The quote method takes a binding,
     # which is then used for any unquote computations.
-    # 
+    #
     # Example:
-    # 
+    #
     #     i = 4
     #     ast = Steadfast.quote(binding) { ->(x) { unquote(i) + x } }
     #     l = Steadfast.eval_ast(ast) #=> ->(x) { 4 + x }
@@ -24,9 +24,9 @@ module Steadfast
     # computation consists of more than one statement. Nested quote calls can be
     # made in order to compute an AST that can be injected into the quoted code.
     # Alternating calls to unquote and quote can be nested arbitrarily.
-    # 
+    #
     # Example:
-    # 
+    #
     #     i = 4
     #     ast = Steadfast.quote(binding) {
     #       x = unquote {
@@ -39,7 +39,7 @@ module Steadfast
     # instead of Steadfast.quote). In addition, nested calls to quote should not
     # provide a binding, just a block. They will automatically inherit the
     # binding of the outermost quote.
-    # 
+    #
     # @param binding [Binding, nil] binding for unquote computation
     # @return [Ruby::Prism::Node] quoted code
     def quote(binding, &block)
@@ -63,11 +63,11 @@ module Steadfast
     # Array, Hash, Module, Class, or Ruby::Prism::Node (an AST). If value is an
     # AST, unquote will return it. All other values are converted to an AST
     # representation as literal values.
-    # 
+    #
     # If a node location is provided, the resulting AST will use that location
     # information (filename + lineno), for purposes of providing correct
     # backtraces.
-    # 
+    #
     # The return value is an AST. If the unquote computation's result is an
     # array of AST nodes, it is returned wrapped in a StatementsNode.
     #
@@ -76,7 +76,7 @@ module Steadfast
     def unquote(value, location = nil)
       __unquote_convert_value__(value, location)
     end
-    
+
     private
 
     # Selects the StatementsNode out of the given AST node. If the
@@ -88,7 +88,7 @@ module Steadfast
     def __quote_normalize_return_value__(node)
       statements = __quote_select_statements_node__(node)
       return node if !statements
-      
+
       (statements.body.size == 1) ? statements.body[0] :  statements
     end
 
@@ -142,7 +142,7 @@ module Steadfast
 
         raise ArgumentError, "Invalid arguments in call to quote" if n2.arguments
         raise ArgumentError, "Missing block in call to quote" if !n2.block
-  
+
         n3 = Steadfast.make_node("Steadfast::Quote.quote(binding) do\nnil \nend", location: n2)
         Steadfast.rewrite(n3, n3.block.body => n2.block.body)
       }

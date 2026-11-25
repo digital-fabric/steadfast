@@ -2390,7 +2390,7 @@ infect_an_assertion :assert_empty, :must_be_empty, :unary
 We get:
 
 ```ruby
-meth = :assert_empty 
+meth = :assert_empty
 new_name = :must_be_empty
 dont_flip = :unary
 block = false
@@ -2421,7 +2421,7 @@ def must_be_empty(*args, **kws)
   # The case statement can also be specialized: if we can find a when condition
   # that is static and *truthy*, we can remove all other when clauses and the
   # else as well.
-  # 
+  #
   # Conversly, if all when conditions are static and *not truthy*, we either
   # remove all but the else clause, and if not else clause is present, just
   # remove the entire case statement.
@@ -2434,9 +2434,9 @@ Another invocation:
 ```ruby
 infect_an_assertion :assert_kind_of, :must_be_kind_of
 
-#=> 
+#=>
 
-meth = :assert_kind_of 
+meth = :assert_kind_of
 new_name = :must_be_kind_of
 dont_flip = false
 block = false

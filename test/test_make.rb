@@ -47,7 +47,7 @@ class MakeNodeTest < Minitest::Test
 
   def test_make_node_binding
     x = 1
-    
+
     n = make_node('x')
     assert_kind_of Ruby::Prism::CallNode, n
     assert_equal :x, n.name
@@ -63,7 +63,7 @@ class MakeNodeTest < Minitest::Test
 
   def test_make_node_lvars_plus_binding
     x = 1
-    
+
     n = make_node('x + y', binding:)
     assert_kind_of Ruby::Prism::CallNode, n
     assert_equal :+, n.name

@@ -17,7 +17,7 @@ module Steadfast
       def set(path1, line1, path2, line2)
         (@map ||= {})["#{path1}:#{line1}"] ||= "#{path2}:#{line2}"
       end
-    
+
       # Translates entries in the given backtrace according to the global source
       # map.
       #
@@ -36,7 +36,7 @@ module Steadfast
       end
 
       private
-  
+
       # Returns a mapped location for the given location entry.
       #
       # @param loc [String] location string of the form file:line
@@ -44,9 +44,9 @@ module Steadfast
       def find_sourcemap_entry(loc)
         loc = @map[loc]
         return nil if !loc
-  
+
         (loc =~ /^\(steadfast-[0-9a-f]+\)\:\d+$/) ? find_sourcemap_entry(loc) : loc
-      end      
+      end
     end
   end
 end
