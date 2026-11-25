@@ -2534,3 +2534,78 @@ def specialize_if(n)
   end
 end
 ```
+
+## Specialization - Determining which nodes are static
+
+Some performance considerations. We want to be able to 
+
+```ruby
+def specialize(ast)
+  Steadfast.rewrite(ast) { |n, &b|
+    next if !is_static_node?(n)
+    ...
+  }
+end
+```
+
+To determine if the node is static, we must look at all its subnodes. If any
+subnode is not static, the root node (the node being checked) cannot be static.
+Since when visiting the tree we start at the top, and then go into the branches,
+we risk recomputing whether a subnode that was already visited is static or not.
+We can use a cache for that.
+
+```ruby
+def specialize(ast)
+  ast = __specialize_eval_static_nodes__(ast)
+  __specialize_branches__(ast)
+end
+
+def __specialize_eval_static_nodes__(ast)
+  static_cache = {}
+  Steadfast.rewrite(ast) { |n, &b|
+    next if !__specialize_is_static_node__?(n, static_cache)
+
+    __specialize_evaluate__(n)
+  }
+end
+
+OP_REGEXP = /^={2,3}|\|{1,2}|\&{1,2}|\+|\-|\*{1,2}|\/|\^|\>|\<|\>/
+
+def __specialize_is_static_node__?(node, cache)
+  return cache[node] if cache.key?(node)
+
+  dynamic = Steadfast.find { |n, &b|
+    case n
+    in P::Callnode(name: OP_REGEXP)
+      false
+    in P::CallNode,
+       P::LocalVariableReadNode, P::LocalVariableWriteNode,
+       P::InstanceVariableReadNode, P::InstanceVariableWriteNode,
+       *more_like_that
+      true
+    end
+    else
+      next (cache[n] = false)
+    end
+  }
+  cache[node] = !dynamic
+end
+
+def __specialize_evaluate__(node)
+  value = Steadfast.eval_ast(node)
+  Steadfast.make_literal(value)
+end
+
+def __specialize_branches__(ast)
+  Steadfast.rewrite(ast) do |n, &b|
+    case n
+    in P::IfNode
+      __specialize_if__(n, &b)
+    in P::CaseNode
+      __specialize_case__(n, &b)
+    else
+      n
+    end
+  end
+end
+```
