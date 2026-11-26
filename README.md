@@ -36,25 +36,33 @@ convenient, rich API for generating and transforming ASTs.
 
 ## Requirements
 
-Steadfast requires Ruby 4.0 or newer.
+Steadfast requires Ruby 4.1 or newer.
 
-## Basic Usage
+## Getting Started
 
-- Use `Steadfast.to_ast` to get the AST of a proc or a method.
-- Rewrite (modify) an AST using `Steadfast.rewrite`.
-- Build an AST using `Steadfast.quote` and `Steadfast.unquote`.
-- Evaluate an AST using `Steadfast.eval_ast`.
+Steadfast provides a variety of tools for working with ASTs. Here are the main
+ones:
+
+- `Steadfast.to_ast` - used to get the AST of a proc or a method.
+- `Steadfast.rewrite` - used to create modified copies of ASTs.
+- `Steadfast.quote` and `Steadfast.unquote` - used to generate ASTs and create
+  code templates.
+- `Steadfast.eval_ast` - used to evaluate ASTs.
+
+In the following example, we'll take a lambda that returns an integer, extract
+its AST, and modify it to return an interpolated string instead.
 
 ```ruby
 require 'steadfast'
 
 l = -> { 42 }
-msg = 'Hello'
-
 ast = Steadfast.to_ast(l)
+
+msg = 'Hello'
 ast2 = Steadfast.rewrite(ast) do |n|
   next n if !(n in Ruby::Prism::IntegerNode(value: 42))
 
+  # Inject the value of a local variable into the string
   Steadfast.quote(binding) { "#{unquote(msg)} from Steadfast!" }
 end
 
@@ -86,7 +94,10 @@ ast = Steadfast.to_ast(->() { foo() })
 
 # replace foo call with bar call
 ast2 = Steadfast.rewrite(ast) { |n|
-  (n in Ruby::Prism::CallNode(name: :foo)) ? Steadfast.quote { bar() } : n
+  # use next to allow the iteration to continue
+  next n if !(n in Ruby::Prism::CallNode(name: :foo))
+ 
+  Steadfast.quote { bar() }
 }
 ```
 
@@ -101,7 +112,7 @@ calls to `Steadfast.rewrite`:
 ```ruby
 Steadfast.rewrite(ast) { |node, &block|
   if (replacement = should_replace_node?(node))
-    Steadfast.rewrite(replace_node, &block)
+    Steadfast.rewrite(replacement, &block)
   else
     node
   end
@@ -133,4 +144,83 @@ foo = 42
 Steadfast.quote(binding) { x + unquote(foo) } #=> x + 42
 ```
 
-To be continued...
+## Creating Nodes
+
+The easiest way to create new AST nodes is by using `Steadfast.quote`, as
+explained above. Literal values can also be created using `Steadfast.unquote`:
+
+```ruby
+Steadfast.unquote({ foo: 1, bar: 2 })
+```
+
+Arbitrary types of nodescan be created by using `Steadfast.make_node` and
+providing a string containing Ruby syntax:
+
+```ruby
+Steadfast.make_node('foo.bar(:baz)') #=> CallNode
+```
+
+The `Steadfast.make_node` method takes the following optional arguments:
+
+- `location`: a Prism node or Prism location which will be used as the location
+  for the generated AST.
+- `lvars`: an array containing local variable names used in the given code
+  snippet.
+- `binding`: a binding for determining local variable names used in the given
+  code snippet.
+
+In addition to `Steadfast.make_node`, additional methods allow the creation of
+specific node types:
+
+- `Steadfast.make_call(name:, receiver:, args:)` - create a call node.
+- `Steadfast.make_def(name:, params:, :body)` - create a method definition.
+
+## Traversing ASTs and Finding Nodes
+
+Use `Steadfast.walk` to visit each node in an AST:
+
+```ruby
+Steadfast.walk(ast) { p it } #=> print out each node in the AST
+```
+
+To find a node, use `Steadfast.find`. This method will return the first node for
+which the given block returns true, or nil if none found:
+
+```ruby
+# look for a call to foo
+Steadfast.find(ast) { n in Ruby::CallNode(receiver: nil, name: :foo) }
+```
+
+To find all nodes that respond to specific criteria, use `Steadfast.find_all`:
+
+```ruby
+# find all method calls without a receiver
+Steadfast.find_all(ast) { n in Ruby::CallNode(receiver: nil) }
+```
+
+## AST Conversion and Evaluation
+
+Additional Steadfast allow you to convert a method or proc to AST, to convert an
+AST to source code, and to evaluate ASTs. To get the AST for a proc or method,
+use `Steadfast.to_ast`:
+
+```ruby
+def foo
+  42
+end
+
+foo_ast = Steadfast.to_ast(method(:foo))
+```
+
+To convert an AST to source code, use `Steadfast.to_source`:
+
+```ruby
+Steadfast.to_source(foo_ast) #=> "def foo..."
+```
+
+To evaluate an AST use `Steadfast.eval_ast`:
+
+```ruby
+ast = quote { puts 'Hi!' }
+Steadfast.eval_ast(ast) #=> 'Hi!!!'
+```

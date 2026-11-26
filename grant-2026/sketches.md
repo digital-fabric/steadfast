@@ -2609,3 +2609,217 @@ def __specialize_branches__(ast)
   end
 end
 ```
+
+# 2026-11-26
+
+Interesting RubyKaigi talk:
+
+https://www.youtube.com/watch?v=zqA0vfKXYsk
+
+Rewrite example 1:
+
+```ruby
+# from this:
+errors[:base] = "author not present"
+
+# to:
+errors.add(:base, "author not present")
+```
+
+Rewrite example 2:
+
+```ruby
+class Post < ActiveRecord::Base
+end
+
+# into:
+class Post < ApplicationRecord
+end
+```
+
+Example 3:
+
+```ruby
+open('https://blah.com')
+
+# into:
+URI.open('https://blah.com')
+```
+
+Example 4:
+
+```ruby
+def setup
+  do_something
+end
+
+def setup
+  super
+  do_something
+end
+```
+
+Example 5:
+
+```ruby
+FactoryBot.create[:user]
+
+# into:
+create[:user]
+```
+
+Example 6µ:
+
+```ruby
+after_commit :add_to_index_later, on: :create
+
+# into:
+after_create_commit :add_to_index_later
+
+Steadfast.rewrite(ast) { |n|
+  next n if !(n in Ruby::Prism::CallNode(receiver: nil, name: :after_commit))
+
+  kwargs = Steadfast.find(n) { it in Ruby::Prism::KeywordHashNode }
+  next n if !kwargs
+
+  on = Steadfast.find(kwargs) { it in AssocNode(key: SymbolNode(unescaped: 'on')) }
+  next n if !on
+
+  name = :"after_#{on.value.unescaped}_commit"
+   
+  quote {  
+    __.call(name: unquote(name), arguments: unquote(n.arguments.arguments[0]))
+  }
+}
+```
+
+What we can see is that in fact with the quote API it's easy to create nodes.
+The harder part is *finding nodes*. How can we make this better. Taking the last example, how can we find the different parts easily?
+
+Is there a DSL hiding in there?
+
+```ruby
+Steadfast.select(ast) {
+  call(name: :after_commit, receiver: nil, kwargs: :on)
+} #=> Returns some Steadfast::SelectionResult object
+.map { |node|
+  args = node.arguments
+  kwarg = Steadfast.select(node) { kwargs(key: :on) }.first
+  quote { ... }
+}
+```
+
+# 2026-11-26
+
+So one possibility is with a DSL in a block. Another possibility is with some
+kind of chained method API:
+
+```ruby
+# Steadfast.elect wraps the AST with a selector object/
+selector = Steadfast.select(ast)
+
+# The selector can reference more than one node:
+selector.selection #=> [ast]
+
+# dig into subnodes, filter
+selector.find(Ruby::Prism::CallNode).filter(receiver: nil, kwargs: :on)
+
+selector.map { |s| # yields a selector for each node
+  s_args = s.call_arguments
+  on_kwarg = s.kwarg(:on)
+  s.call_kwargs
+  name = :"after_#{on.value.unescaped}_commit"
+   
+  quote {  
+    __.call(name: unquote(name), arguments: unquote(n.arguments.arguments[0]))
+  }
+}
+```
+
+No, doesn't feel right. In this case we want to be able to destructure a
+CallNode. Maybe we should concentrate on that:
+
+```ruby
+# suppose we have a node that represents a call node, and we have some kind of
+# query interface that can tell us things about this node and its entire
+# subtree:
+
+q = Steadfast.query(node)
+q.receiver #=> nil
+q.arguments #=> [ positional: [value_node...], keyword: { on: value_node }]
+q.name #=> method name
+q.args #=> [value_node...]
+q.kwargs #=> { on: value_node }
+```
+
+So we'll have something like:
+
+```ruby
+Steadfast.rewrite(ast) { |n|
+  next n if !(n in Ruby::Prism::CallNode(receiver: nil, name: :after_commit))
+
+  q = Steadfast.query(n)
+  pargs = q.arguments[:pargs]
+  kwargs = q.arguments[:kwargs]
+  next n if !kwargs[:on]
+
+  quote {  
+    __.call(name: :"after_#{kwargs[:on]}_commit", arguments: unquote(pargs))
+  }
+}
+```
+
+This is much better, and we can create multiple kinds of query objects
+specialized in specific node types. Let's take another example:
+
+```ruby
+def convert_tail_call(tail, params)
+  
+  lvars = [*params.requireds.map(&:name), *params.optionals.map(&:name)]
+  values = tail.arguments.arguments
+
+  l = eval("-> { #{lvars.join(', ')} = [nil] }")
+  multi_write_node = Steadfast.to_ast(l).body.body[0]
+  Steadfast.rewrite(multi_write_node, multi_write_node.value => { elements: values })
+end
+
+def rewrite_with_tail_call(meth)
+  ast = Steadfast.to_ast(meth)
+  params = ast.parameters
+  *stmts, tail = ast.body.body
+
+  raise "Not a tail call method!" if !(tail.is_a?(Ruby::Prism::CallNode) && tail.name == meth.name)
+
+  body2 = Steadfast.make_loop(*stmts, convert_tail_call(tail, params))
+  ast2 = Steadfast.rewrite(ast, ast.body => { body: [body2] })
+  eval(Steadfast.to_source(ast2))
+end
+```
+
+On second thought, maybe we implement this as extensions to the different Prism
+node classes. The problem with that is how to name the methods.
+
+Another possibility is to have some something like `Steadfast.info(node)`, which
+provides information, or maybe a dedicated method like
+`Steadfast.call_info(node)`:
+
+```ruby
+Steadfast.rewrite(ast) { |n|
+  next n if !(n in Ruby::Prism::CallNode(receiver: nil, name: :after_commit))
+
+  info = Steadfast.call_info(n)
+  pargs = info.positional_arguments
+  kwargs = info.keyword_arguments
+  next n if !kwargs[:on]
+
+  quote {
+    __.call(name: :"after_#{kwargs[:on]}_commit", arguments: unquote(pargs))
+  }
+}
+```
+
+This is pretty good. We make everything explicit, we can verify that the given
+node is a CallNode. We can also namespace the methods like we did for `quote`
+and `make`. So maybe something like `Steadfast.info(node)`, and then
+`Steadfast.call_info(node)` for specialized method.
+
