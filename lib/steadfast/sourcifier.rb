@@ -17,6 +17,7 @@ module Steadfast
     VISIT_PLANS = {
       alias_global_variable:      [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
       alias_method:               [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
+      alternation_pattern:        [:left, :whitespace, :operator_loc, :whitespace, :right],
       and:                        [:left, :whitespace, :operator_loc, :whitespace, :right],
       assoc_splat:                [:operator_loc, :value],
       back_reference_read:        :emit_verbatim,

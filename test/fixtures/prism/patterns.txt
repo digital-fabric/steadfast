@@ -124,6 +124,9 @@ foo in __FILE__
 foo in __LINE__
 foo in __ENCODING__
 foo in -> { bar }
+foo in A | B
+foo in [] | {}
+foo in :foo | :bar
 
 case foo; in bar then end
 case foo; in 1 then end
