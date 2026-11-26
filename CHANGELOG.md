@@ -1,3 +1,11 @@
+# 0.5.0 2026-11-26
+
+- Add examples
+- Sourcifier: fix source formatting for `ForwardingSuperNode`, `ImaginaryNode`, `ProgramNode`
+- Add support for AlternationPatternNode
+- Add `Steadfast.quote` - Include `Steadfast::Quote` methods in `Steadfast`
+- `Steadfast.rewrite` - raise on invalid AST
+
 # 0.4.0 2026-11-25
 
 - Improve sourcifier output
