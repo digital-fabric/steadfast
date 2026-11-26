@@ -19,7 +19,7 @@ module Minitest::Assertions
     exp = format_src(exp)
     act = format_src(act)
 
-    msg = message(msg) { "Expected: \n\n #{mu_pp(act)} \n\n to equal: \n\n #{mu_pp(exp)}" }
+    msg = message(msg) { "Expected: \n\n #{act} \n\n to equal: \n\n #{exp}" }
     assert_equal exp, act, msg
   end
 
@@ -30,6 +30,7 @@ module Minitest::Assertions
   rescue SyntaxTree::Parser::ParseError => e
     puts '*' * 40
     puts e.message
+    puts e.backtrace.join("\n")
     puts src
     exit!(1)
   end

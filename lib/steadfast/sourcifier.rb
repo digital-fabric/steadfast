@@ -322,6 +322,10 @@ module Steadfast
       emit_code(node.constant)
       emit_code(node.opening_loc)
       visit_comma_separated_nodes(node.elements)
+      if node.elements && node.elements.size > 0 && node.rest
+        emit_comma
+      end
+      emit_code(node.rest)
       emit_code(node.closing_loc)
     end
 
