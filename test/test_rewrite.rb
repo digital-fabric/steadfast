@@ -167,6 +167,15 @@ class RewriteTailCallTest < Minitest::Test
     Steadfast.rewrite(loop_node, loop_block_body => { body: statements })
   end
 
+  def convert_tail_call(tail, params)
+    lvars = [*params.requireds.map(&:name), *params.optionals.map(&:name)]
+    values = tail.arguments.arguments
+
+    l = eval("-> { #{lvars.join(', ')} = [nil] }")
+    multi_write_node = Steadfast.to_ast(l).body.body[0]
+    Steadfast.rewrite(multi_write_node, multi_write_node.value => { elements: values })
+  end
+
   def rewrite_with_tail_call(meth)
     ast = Steadfast.to_ast(meth)
     params = ast.parameters
@@ -177,19 +186,6 @@ class RewriteTailCallTest < Minitest::Test
     body2 = make_loop(*body, convert_tail_call(tail, params))
     ast2 = Steadfast.rewrite(ast, ast.body => { body: [body2] })
     eval(Steadfast.to_source(ast2))
-  end
-
-  def make_multi_write_node(names, values)
-    l = eval("-> { #{names.join(', ')} = [nil] }")
-    multi_write_node = Steadfast.to_ast(l).body.body[0]
-    Steadfast.rewrite(multi_write_node, multi_write_node.value => { elements: values })
-  end
-
-  def convert_tail_call(tail, params)
-    make_multi_write_node(
-      [*params.requireds.map(&:name), *params.optionals.map(&:name)],
-      tail.arguments.arguments
-    )
   end
 
   def fact(n, acc = 1)
