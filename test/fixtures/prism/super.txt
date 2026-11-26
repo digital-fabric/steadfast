@@ -15,5 +15,9 @@ super {}
 
 super(1, 2, 3) {}
 
+super { foo }
+
+super(1, 2) { foo }
+
 super(1, 2, 3, &:foo)
 }

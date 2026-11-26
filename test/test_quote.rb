@@ -162,11 +162,6 @@ class QuoteScenarioValidator < Minitest::Test
       }
     }
     Steadfast.eval_ast(ast)
-  rescue => e
-    p e
-    bt = Steadfast::SourceMapping.translate_backtrace(e.backtrace)
-    bt.each { puts it }
-    exit!(1)
   end
 
   def capture_exception

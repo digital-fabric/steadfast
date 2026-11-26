@@ -51,11 +51,10 @@ module Steadfast
                                    :statements, :newline, :end_keyword_loc],
       forwarding_arguments:       :emit_verbatim,
       forwarding_parameter:       :emit_verbatim,
-      forwarding_super:           :emit_verbatim,
+      forwarding_super:           [:keyword_loc, :block],
       global_variable_read:       :emit_verbatim,
       global_variable_target:     :emit_verbatim,
       global_variable_write:      [:name_loc, :operator_loc, :value],
-      imaginary:                  :emit_verbatim,
       implicit:                   :nop,
       implicit_rest:              :nop,
       in:                         [:in_loc, :whitespace, :pattern, :whitespace, :then_loc],
@@ -89,7 +88,7 @@ module Steadfast
       optional_keyword_parameter: [:name_loc, :whitespace, :value],
       or:                         [:left, :whitespace, :operator_loc, :whitespace, :right],
       parentheses:                [:opening_loc, :body, :closing_loc],
-      program:                    :emit_verbatim,
+      program:                    [:statements],
       pinned_expression:          [:operator_loc, :lparen_loc, :expression, :rparen_loc],
       pinned_variable:            [:operator_loc, :variable],
       rational:                   :emit_verbatim,
@@ -359,6 +358,11 @@ module Steadfast
       emit_code(node.statements)
       emit_newline
       emit_code(node.subsequent)
+    end
+
+    def visit_imaginary_node(node)
+      emit_code(node.numeric)
+      emit('i')
     end
 
     def visit_interpolated_symbol_node(node)
@@ -673,6 +677,16 @@ module Steadfast
     # @param node [Ruby::Prism::Node]
     # @return [void]
     def emit_verbatim(node)
+      if node.child_nodes.size > 0
+        puts
+        puts '*' * 40
+        pp node
+        puts
+        pp node.child_nodes
+        puts
+        puts caller.join("\n")
+        exit!
+      end
       emit_code(node.location)
     end
 
