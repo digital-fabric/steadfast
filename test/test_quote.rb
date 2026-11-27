@@ -35,7 +35,7 @@ class QuoteTest < Minitest::Test
 
     n = quote(nil) { foo }
     assert_kind_of Ruby::Prism::CallNode, n
-    assert_equal :foo, Steadfast.eval_ast(n, self)
+    assert_equal :foo, Steadfast.eval_ast(n, receiver: self)
   end
 
   def test_quote_no_unquote_multiple_statements
@@ -47,15 +47,15 @@ class QuoteTest < Minitest::Test
   def test_quote_unquote_literal
     n = quote(binding) { unquote(2) }
     assert_kind_of Ruby::Prism::IntegerNode, n
-    assert_equal 2, Steadfast.eval_ast(n, self)
+    assert_equal 2, Steadfast.eval_ast(n, receiver: self)
 
     n = quote(binding) { unquote([:a,  1, [:b, 2]]) }
     assert_kind_of Ruby::Prism::ArrayNode, n
-    assert_equal([:a,  1, [:b, 2]], Steadfast.eval_ast(n, self))
+    assert_equal([:a,  1, [:b, 2]], Steadfast.eval_ast(n, receiver: self))
 
     n = quote(binding) { unquote({ a: 1, b: 2}) }
     assert_kind_of Ruby::Prism::HashNode, n
-    assert_equal({ a: 1, b: 2}, Steadfast.eval_ast(n, self))
+    assert_equal({ a: 1, b: 2}, Steadfast.eval_ast(n, receiver: self))
   end
 
   def test_quote_unquote_from_binding

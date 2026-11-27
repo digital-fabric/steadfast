@@ -40,17 +40,34 @@ module Steadfast
       Rewriter.rewrite(ast, **replacements, &block)
     end
 
-    # Evaluates the given AST in the context of the given receiver or binding.
+    # Evaluates the given AST in the context of the given receiver, class or
+    # binding. If the receiver: option is given, an instance_eval is performed.
+    # If the class: option is given, a class_eval is performed. Otherwise, the
+    # given binding: is used for a normal eval. If no binding is given, no
+    # binding is passed to eval.
     #
     # @param ast [Ruby::Prism::Node]
-    # @param eval_receiver [any]
-    # @param eval_binding [Binding, nil]
+    # @param receiver: [any, nil] instance_eval receiver
+    # @param class: [Class, nil] class_eval receiver
+    # @param binding: [Binding, nil] binding
     # @return [any]
-    def eval_ast(ast, eval_receiver = nil, eval_binding = nil, source_location: nil)
+    def eval_ast(ast, source_location: nil, **opts)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
 
+      source_location = compute_eval_source_location(source_location)
+      src = to_source(ast, source_location:, sourcemap: true, frozen_string_literal: true)
+      if (receiver = opts[:receiver])
+        receiver.instance_eval(src, *source_location)
+      elsif (receiver = opts[:class])
+        receiver.class_eval(src, *source_location)
+      else
+        eval(src, opts[:binding], *source_location)
+      end
+    end
+
+    def compute_eval_source_location(source_location)
       case source_location
-      when nil
+      in nil
         # Important: ideally we'd set the source location line no to 0 (to
         # compensate for the #frozen_string_literal comment at the top).
         # However, while `eval` respects a starting lineno set to 0, Prism does
@@ -60,17 +77,13 @@ module Steadfast
         # Note that when source_location is not nil, we do decrement the start
         # lineno. Hopefully some day this wart will be removed from Ruby.G
         source_location = ["(steadfast-#{SecureRandom.hex(4)})", 1]
-      when :caller
-        l = caller_locations[0]
+      in :caller
+        l = caller_locations[1]
         source_location = [l.path, l.lineno - 1]
+      in [String => filename, Integer => lineno]
+        source_location = [filename, lineno - 1]
       else
-        source_location = [source_location[0], source_location[1] - 1]
-      end
-      src = to_source(ast, source_location:, sourcemap: true, frozen_string_literal: true)
-      if eval_receiver
-        eval_receiver.instance_eval(src, source_location[0], source_location[1])
-      else
-        eval(src, eval_binding || binding, source_location[0], source_location[1])
+        raise ArgumentError, "Invalid source_location given"
       end
     end
 

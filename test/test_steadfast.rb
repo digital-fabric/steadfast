@@ -32,7 +32,7 @@ class EvalASTTest < Minitest::Test
     l = ->(z) { x + @y + z }
 
     ast = Steadfast.to_ast(l)
-    l2 = Steadfast.eval_ast(ast, nil, l.binding)
+    l2 = Steadfast.eval_ast(ast, binding: l.binding)
 
     assert_kind_of Proc, l2
     assert_equal 12, l2.(7)
@@ -46,7 +46,7 @@ class EvalASTTest < Minitest::Test
 
     ast = Steadfast.to_ast(l)
     n = ast.body.body[0]
-    l2 = Steadfast.eval_ast(ast, nil, l.binding)
+    l2 = Steadfast.eval_ast(ast, binding: l.binding)
 
     assert_kind_of Proc, l2
     l2.()

@@ -267,7 +267,7 @@ class SyntheticASTSourceMappingTest < Minitest::Test
       end
       n
     }
-    Steadfast.eval_ast(ast2, nil, l.binding)
+    Steadfast.eval_ast(ast2, binding: l.binding)
   end
 
   def capture_exception

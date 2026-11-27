@@ -132,7 +132,7 @@ module Steadfast
 
     def __unquote_evaluate_target_node__(node, binding, location)
       node2 = __unquote_rewrite_nested_quote__(node, binding)
-      v = Steadfast.eval_ast(node2, nil, binding)
+      v = Steadfast.eval_ast(node2, binding:)
       __unquote_convert_value__(v, location)
     end
 

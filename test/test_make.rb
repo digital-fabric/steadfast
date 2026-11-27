@@ -112,7 +112,7 @@ class MakeDefTest < Minitest::Test
     assert_source_match "def foo(); 'foo'; end", Steadfast.to_source(n)
 
     o = Object.new
-    Steadfast.eval_ast(n, o)
+    Steadfast.eval_ast(n, receiver: o)
     assert_equal 'foo', o.foo
   end
 
@@ -142,7 +142,7 @@ class MakeDefTest < Minitest::Test
     assert_source_match "def foo(); raise 'foobar'; end", Steadfast.to_source(n)
 
     o = Object.new
-    Steadfast.eval_ast(n, o)
+    Steadfast.eval_ast(n, receiver: o)
 
     e = capture_exception { o.foo }
     assert_kind_of RuntimeError, e
@@ -162,7 +162,7 @@ class MakeDefTest < Minitest::Test
     assert_source_match "def add(x, y); x + y; end", Steadfast.to_source(n)
 
     o = Object.new
-    Steadfast.eval_ast(n, o)
+    Steadfast.eval_ast(n, receiver: o)
     assert_equal 7, o.add(3, 4)
   end
 
@@ -299,7 +299,7 @@ class MakeConstantTest < Minitest::Test
   def test_make_constant
     n = make_constant('ABC')
     assert_kind_of Ruby::Prism::ConstantReadNode, n
-    assert_equal 42, Steadfast.eval_ast(n, self)
+    assert_equal 42, Steadfast.eval_ast(n, receiver: self)
   end
 
   def test_make_constant_invalid_name
