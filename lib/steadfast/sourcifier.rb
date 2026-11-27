@@ -110,6 +110,8 @@ module Steadfast
       optional_keyword_parameter:     [:name_loc, :whitespace, :value],
       or:                             [:left, :whitespace, :operator_loc, :whitespace, :right],
       parentheses:                    [:opening_loc, :body, :closing_loc],
+      post_execution:                 [:keyword_loc, :whitespace, :opening_loc, :newline, :statements, :newline, :closing_loc],
+      pre_execution:                  [:keyword_loc, :whitespace, :opening_loc, :newline, :statements, :newline, :closing_loc],
       program:                        [:statements],
       pinned_expression:              [:operator_loc, :lparen_loc, :expression, :rparen_loc],
       pinned_variable:                [:operator_loc, :variable],

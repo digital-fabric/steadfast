@@ -246,3 +246,15 @@ class SourcifierSourceMapTest < Minitest::Test
     assert_equal E1_LINE + 3, line
   end
 end
+
+class SourcifierPrePostExecutionNodeTest < Minitest::Test
+  def test_pre_execution_node
+    n = Steadfast.make_node("BEGIN {\nfoo\n}")
+    assert_equal "BEGIN {\nfoo\n}", Steadfast.to_source(n)
+  end
+
+  def test_post_execution_node
+    n = Steadfast.make_node("END {\nfoo\n}")
+    assert_equal "END {\nfoo\n}", Steadfast.to_source(n)
+  end
+end
