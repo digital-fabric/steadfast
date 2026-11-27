@@ -119,16 +119,21 @@ module Steadfast
     # @return [Ruby::Prism::Node]
     def __unquote_evaluate__(node, binding)
       if node.arguments && (node.arguments.arguments.size == 1) && !node.block
-        arg = __unquote_rewrite_nested_quote__(node.arguments.arguments[0], binding)
-        v = Steadfast.eval_ast(arg, nil, binding)
-        __unquote_convert_value__(v, node)
+        # unquote(expr)
+        __unquote_evaluate_target_node__(node.arguments.arguments[0], binding, node)
       elsif node.block && !node.arguments
-        ast = __unquote_rewrite_nested_quote__(node.block.body, binding)
-        v = Steadfast.eval_ast(node.block.body, nil, binding)
-        __unquote_convert_value__(v, node)
+        # unquote { expr }
+        __unquote_evaluate_target_node__(node.block.body, binding, node)
       else
+        # unquote(), unquote(expr) { expr }
         raise ArgumentError, "Invalid unquote arguments"
       end
+    end
+
+    def __unquote_evaluate_target_node__(node, binding, location)
+      node2 = __unquote_rewrite_nested_quote__(node, binding)
+      v = Steadfast.eval_ast(node2, nil, binding)
+      __unquote_convert_value__(v, location)
     end
 
     # Rewrites nested calls to quote inside an unquote block or expression.

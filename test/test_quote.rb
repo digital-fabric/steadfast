@@ -91,6 +91,12 @@ class QuoteTest < Minitest::Test
     assert_equal '1,foo', Steadfast.eval_ast(n)
   end
 
+  def test_quote_unquote_nested_quote
+    n = quote(binding) { unquote { quote { 'foo' } } }
+    assert_kind_of Ruby::Prism::StringNode, n
+    assert_equal 'foo', Steadfast.eval_ast(n)
+  end
+
   def test_quote_unquote_invalid_args
     assert_raises(ArgumentError) { quote(nil) { unquote(1, 2) } }
     assert_raises(ArgumentError) { quote(nil) { unquote(1) { 2 } } }
