@@ -121,6 +121,25 @@ class QuoteTest < Minitest::Test
     assert_kind_of Ruby::Prism::StatementsNode, n
     assert_source_match "42; 43", Steadfast.to_source(n)
   end
+
+  def test_quote_unquote_nop    
+    n1 = quote(binding) {
+      -> {
+        foo
+        unquote(:__nop__)
+        bar
+        unquote(nil)
+      }
+    }
+    n2 = quote(binding) {
+      -> {
+        foo
+        bar
+        nil
+      }
+    }
+    assert_source_match Steadfast.to_source(n2), Steadfast.to_source(n1)
+  end
 end
 
 class UnquoteTest < Minitest::Test
@@ -138,6 +157,11 @@ class UnquoteTest < Minitest::Test
     n = unquote(Steadfast.to_ast(->() { 42 }))
     assert_kind_of Ruby::Prism::LambdaNode, n
     assert_equal 42, Steadfast.eval_ast(n).()
+  end
+
+  def test_unquote_nop
+    assert_kind_of Ruby::Prism::NilNode, unquote(nil)
+    assert_nil unquote(:__nop__)
   end
 end
 

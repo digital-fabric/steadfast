@@ -161,6 +161,8 @@ module Steadfast
     # @return [Ruby::Prism::Node]
     def __unquote_convert_value__(value, location)
       case value
+      when :__nop__
+        nil
       when Integer, Float, String, Symbol, Range, Regexp, nil, true, false, Hash, Class, Module
         Steadfast.make_literal(value, location:)
       when Array
