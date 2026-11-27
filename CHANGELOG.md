@@ -1,3 +1,10 @@
+# 0.6.0 2026-11-27
+
+- Add support for emit-nothing with `unquote(:__nop__)`
+- Refactor unquote code, fix rewriting of nested quote expressions
+- Sourcifier: Add support for missing node types (thanks @joeldrapper !)
+- Sourcifier: fix `HashPatternNode` with rest
+
 # 0.5.0 2026-11-26
 
 - Add examples
