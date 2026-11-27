@@ -219,3 +219,32 @@ I've also published a blog post describing the work done.
 - [v] Various improvements to make_xxx tools
 - [v] Minor improvements to sourcifier
 - [v] Implement basic quote / unquote capability
+
+# 2026-11-27
+
+- [v] Add support for various Prism node types (thanks Joel!)
+- [v] Fix rewriting of nested quote in unquote block
+- [v] Add support for :__nop__ unquote return value
+- [v] Worked on README
+- [v] Added some example scripts
+
+## Next on the plate
+
+- Add inline test using quote / unquote
+- Add more tests for emitting different node types / expression types
+- In eval_ast, add translate_backtrace option for wrapping the code in rescue
+  block with automatic backtrace translation
+- Change eval_ast to accept kwargs for options:
+  - receiver: receiver object
+  - class: for doing class_eval
+  - binding: binding
+  - source_location:
+  - translate_backtrace:
+- Refactor core methods:
+  - under `module Steadfast::AST`
+    - to_ast: rename to `ast`
+    - to_source: rename to `source`
+    - eval_ast: kwargs
+    - walk
+    - find
+    - find_all
