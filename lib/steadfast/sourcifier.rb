@@ -15,102 +15,126 @@ module Steadfast
     # its visit plan. Nodes requiring special logic have normal visit_xxx_node
     # method below.
     VISIT_PLANS = {
-      alias_global_variable:      [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
-      alias_method:               [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
-      alternation_pattern:        [:left, :whitespace, :operator_loc, :whitespace, :right],
-      and:                        [:left, :whitespace, :operator_loc, :whitespace, :right],
-      assoc_splat:                [:operator_loc, :value],
-      back_reference_read:        :emit_verbatim,
-      block:                      [:opening_loc, :parameters, :newline, :body, :newline, :closing_loc],
-      block_argument:             [:operator_loc, :expression],
-      block_local_variable:       :emit_verbatim,
-      block_parameter:            [:operator_loc, :name_loc],
-      break:                      [:keyword_loc, :whitespace, :arguments],
-      call_target:                [:receiver, :call_operator_loc, :message_loc],
-      capture_pattern:            [:value, :whitespace, :operator_loc, :whitespace, :target],
-      class:                      [:class_keyword_loc, :whitespace, :constant_path, :whitespace,
-                                   :inheritance_operator_loc, :whitespace, :superclass, :newline,
-                                   :body, :newline, :end_keyword_loc],
-      class_variable_read:        :emit_verbatim,
-      class_variable_target:      :emit_verbatim,
-      class_variable_write:       [:name_loc, :operator_loc, :value],
-      constant_path:              [:parent, :delimiter_loc, :name_loc],
-      constant_path_write:        [:target, :operator_loc, :value],
-      constant_read:              :emit_verbatim,
-      constant_write:             [:name_loc, :operator_loc, :value],
-      defined:                    [:keyword_loc, :lparen_loc, :value, :rparen_loc],
-      else:                       [:else_keyword_loc, :newline, :statements],
-      embedded_statements:        [:opening_loc, :statements, :closing_loc],
-      embedded_variable:          [:operator_loc, :variable],
-      ensure:                     [:ensure_keyword_loc, :newline, :statements],
-      false:                      :emit_verbatim,
-      flip_flop:                  [:left, :operator_loc, :right],
-      float:                      :emit_verbatim,
-      for:                        [:for_keyword_loc, :whitespace, :index, :whitespace, :in_keyword_loc,
-                                   :whitespace, :collection, :whitespace, :do_keyword_loc, :newline,
-                                   :statements, :newline, :end_keyword_loc],
-      forwarding_arguments:       :emit_verbatim,
-      forwarding_parameter:       :emit_verbatim,
-      forwarding_super:           [:keyword_loc, :block],
-      global_variable_read:       :emit_verbatim,
-      global_variable_target:     :emit_verbatim,
-      global_variable_write:      [:name_loc, :operator_loc, :value],
-      implicit:                   :nop,
-      implicit_rest:              :nop,
-      in:                         [:in_loc, :whitespace, :pattern, :whitespace, :then_loc],
-      index_target:               [:receiver, :opening_loc, :arguments, :closing_loc],
+      alias_global_variable:          [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
+      alias_method:                   [:keyword_loc, :whitespace, :new_name, :whitespace, :old_name],
+      alternation_pattern:            [:left, :whitespace, :operator_loc, :whitespace, :right],
+      and:                            [:left, :whitespace, :operator_loc, :whitespace, :right],
+      assoc_splat:                    [:operator_loc, :value],
+      back_reference_read:            :emit_verbatim,
+      block:                          [:opening_loc, :parameters, :newline, :body, :newline, :closing_loc],
+      block_argument:                 [:operator_loc, :expression],
+      block_local_variable:           :emit_verbatim,
+      block_parameter:                [:operator_loc, :name_loc],
+      break:                          [:keyword_loc, :whitespace, :arguments],
+      call_and_write:                 [:receiver, :call_operator_loc, :message_loc, :whitespace, :operator_loc, :whitespace, :value],
+      call_or_write:                  [:receiver, :call_operator_loc, :message_loc, :whitespace, :operator_loc, :whitespace, :value],
+      call_target:                    [:receiver, :call_operator_loc, :message_loc],
+      capture_pattern:                [:value, :whitespace, :operator_loc, :whitespace, :target],
+      class:                          [
+                                        :class_keyword_loc, :whitespace, :constant_path, :whitespace,
+                                        :inheritance_operator_loc, :whitespace, :superclass, :newline,
+                                        :body, :newline, :end_keyword_loc
+                                      ],
+      class_variable_and_write:       [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      class_variable_operator_write:  [:name_loc, :whitespace, :binary_operator_loc, :value],
+      class_variable_or_write:        [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      class_variable_read:            :emit_verbatim,
+      class_variable_target:          :emit_verbatim,
+      class_variable_write:           [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      constant_and_write:             [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      constant_operator_write:        [:name_loc, :whitespace, :binary_operator_loc, :whitespace, :value],
+      constant_or_write:              [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      constant_path:                  [:parent, :delimiter_loc, :name_loc],
+      constant_path_and_write:        [:target, :whitespace, :operator_loc, :whitespace, :value],
+      constant_path_operator_write:   [:target, :whitespace, :binary_operator_loc, :whitespace, :value],
+      constant_path_or_write:         [:target, :whitespace, :operator_loc, :whitespace, :value],
+      constant_path_target:           [:parent, :delimiter_loc, :name_loc],
+      constant_path_write:            [:target, :whitespace, :operator_loc, :whitespace, :value],
+      constant_read:                  :emit_verbatim,
+      constant_target:                :emit_verbatim,
+      constant_write:                 [:name_loc, :operator_loc, :value],
+      defined:                        [:keyword_loc, :lparen_loc, :value, :rparen_loc],
+      else:                           [:else_keyword_loc, :newline, :statements],
+      embedded_statements:            [:opening_loc, :statements, :closing_loc],
+      embedded_variable:              [:operator_loc, :variable],
+      ensure:                         [:ensure_keyword_loc, :newline, :statements],
+      false:                          :emit_verbatim,
+      flip_flop:                      [:left, :operator_loc, :right],
+      float:                          :emit_verbatim,
+      for:                            [
+                                        :for_keyword_loc, :whitespace, :index, :whitespace, :in_keyword_loc,
+                                        :whitespace, :collection, :whitespace, :do_keyword_loc, :newline,
+                                        :statements, :newline, :end_keyword_loc
+                                      ],
+      forwarding_arguments:           :emit_verbatim,
+      forwarding_parameter:           :emit_verbatim,
+      forwarding_super:               [:keyword_loc, :block],
+      global_variable_and_write:      [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      global_variable_operator_write: [:name_loc, :whitespace, :binary_operator_loc, :whitespace, :value],
+      global_variable_or_write:       [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      global_variable_read:           :emit_verbatim,
+      global_variable_target:         :emit_verbatim,
+      global_variable_write:          [:name_loc, :operator_loc, :value],
+      implicit:                       :nop,
+      implicit_rest:                  :nop,
+      in:                             [:in_loc, :whitespace, :pattern, :whitespace, :then_loc],
+      index_target:                   [:receiver, :opening_loc, :arguments, :closing_loc],
+      instance_variable_and_write:    [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
       instance_variable_operator_write: [:name_loc, :whitespace, :binary_operator_loc, :whitespace, :value],
-      instance_variable_or_write: [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
-      instance_variable_read:     :emit_verbatim,
-      instance_variable_target:   :emit_verbatim,
-      instance_variable_write:    [:name_loc, :operator_loc, :value],
-      integer:                    :emit_verbatim,
-      it_parameters:              :nop,
-      it_local_variable_read:     :emit_verbatim,
-      keyword_rest_parameter:     [:operator_loc, :name_loc],
-      keyword_parameter:          :emit_verbatim,
-      lambda:                     [:operator_loc, :parameters, :whitespace, :opening_loc, :newline, :body, :newline, :closing_loc],
-      local_variable_and_write:   [:name_loc, :operator_loc, :value],
-      local_variable_operator_write: [:name_loc, :binary_operator_loc, :value],
-      local_variable_or_write:    [:name_loc, :operator_loc, :value],
-      local_variable_read:        :emit_verbatim,
-      local_variable_target:      :emit_verbatim,
-      local_variable_write:       [:name_loc, :operator_loc, :value],
-      match_predicate:            [:value, :whitespace, :operator_loc, :whitespace, :pattern],
-      match_required:             [:value, :whitespace, :operator_loc, :whitespace, :pattern],
-      match_write:                [:call],
-      module:                     [:module_keyword_loc, :whitespace, :constant_path, :newline, :body, :newline, :end_keyword_loc],
-      next:                       [:keyword_loc, :whitespace, :arguments],
-      nil:                        :emit_verbatim,
-      no_keywords_parameter:      :emit_verbatim,
-      numbered_parameters:        :nop,
-      optional_parameter:         [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
-      optional_keyword_parameter: [:name_loc, :whitespace, :value],
-      or:                         [:left, :whitespace, :operator_loc, :whitespace, :right],
-      parentheses:                [:opening_loc, :body, :closing_loc],
-      program:                    [:statements],
-      pinned_expression:          [:operator_loc, :lparen_loc, :expression, :rparen_loc],
-      pinned_variable:            [:operator_loc, :variable],
-      rational:                   :emit_verbatim,
-      redo:                       :emit_verbatim,
-      regular_expression:         :emit_verbatim,
-      required_parameter:         :emit_verbatim,
-      required_keyword_parameter: :emit_verbatim,
-      rescue_modifier:            [:expression, :whitespace, :keyword_loc, :whitespace, :rescue_expression],
-      rest_parameter:             [:operator_loc, :name_loc],
-      retry:                      :emit_verbatim,
-      return:                     [:keyword_loc, :whitespace, :arguments],
-      self:                       :emit_verbatim,
-      singleton_class:            [:class_keyword_loc, :whitespace, :operator_loc, :whitespace, :expression,
-                                   :newline, :body, :newline, :end_keyword_loc],
-      source_encoding:            :emit_verbatim,
-      source_file:                :emit_verbatim,
-      source_line:                :emit_verbatim,
-      splat:                      [:operator_loc, :expression],
-      symbol:                     :emit_verbatim,
-      true:                       :emit_verbatim,
-      x_string:                   :emit_verbatim,
-      yield:                      [:keyword_loc, :lparen_loc, :arguments, :rparen_loc]
+      instance_variable_or_write:     [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      instance_variable_read:         :emit_verbatim,
+      instance_variable_target:       :emit_verbatim,
+      instance_variable_write:        [:name_loc, :operator_loc, :value],
+      integer:                        :emit_verbatim,
+      it_parameters:                  :nop,
+      it_local_variable_read:         :emit_verbatim,
+      keyword_rest_parameter:         [:operator_loc, :name_loc],
+      keyword_parameter:              :emit_verbatim,
+      lambda:                         [:operator_loc, :parameters, :whitespace, :opening_loc, :newline, :body, :newline, :closing_loc],
+      local_variable_and_write:       [:name_loc, :operator_loc, :value],
+      local_variable_operator_write:  [:name_loc, :binary_operator_loc, :value],
+      local_variable_or_write:        [:name_loc, :operator_loc, :value],
+      local_variable_read:            :emit_verbatim,
+      local_variable_target:          :emit_verbatim,
+      local_variable_write:           [:name_loc, :operator_loc, :value],
+      match_predicate:                [:value, :whitespace, :operator_loc, :whitespace, :pattern],
+      match_required:                 [:value, :whitespace, :operator_loc, :whitespace, :pattern],
+      match_write:                    [:call],
+      module:                         [:module_keyword_loc, :whitespace, :constant_path, :newline, :body, :newline, :end_keyword_loc],
+      next:                           [:keyword_loc, :whitespace, :arguments],
+      nil:                            :emit_verbatim,
+      no_keywords_parameter:          :emit_verbatim,
+      numbered_parameters:            :nop,
+      numbered_reference_read:        :emit_verbatim,
+      optional_parameter:             [:name_loc, :whitespace, :operator_loc, :whitespace, :value],
+      optional_keyword_parameter:     [:name_loc, :whitespace, :value],
+      or:                             [:left, :whitespace, :operator_loc, :whitespace, :right],
+      parentheses:                    [:opening_loc, :body, :closing_loc],
+      program:                        [:statements],
+      pinned_expression:              [:operator_loc, :lparen_loc, :expression, :rparen_loc],
+      pinned_variable:                [:operator_loc, :variable],
+      rational:                       :emit_verbatim,
+      redo:                           :emit_verbatim,
+      regular_expression:             :emit_verbatim,
+      required_parameter:             :emit_verbatim,
+      required_keyword_parameter:     :emit_verbatim,
+      rescue_modifier:                [:expression, :whitespace, :keyword_loc, :whitespace, :rescue_expression],
+      rest_parameter:                 [:operator_loc, :name_loc],
+      retry:                          :emit_verbatim,
+      return:                         [:keyword_loc, :whitespace, :arguments],
+      self:                           :emit_verbatim,
+      singleton_class:                [
+                                        :class_keyword_loc, :whitespace, :operator_loc, :whitespace, :expression,
+                                        :newline, :body, :newline, :end_keyword_loc
+                                      ],
+      source_encoding:                :emit_verbatim,
+      source_file:                    :emit_verbatim,
+      source_line:                    :emit_verbatim,
+      splat:                          [:operator_loc, :expression],
+      symbol:                         :emit_verbatim,
+      true:                           :emit_verbatim,
+      x_string:                       :emit_verbatim,
+      yield:                          [:keyword_loc, :lparen_loc, :arguments, :rparen_loc]
     }
 
     attr_reader :buffer
@@ -369,23 +393,6 @@ module Steadfast
       emit('i')
     end
 
-    def visit_interpolated_symbol_node(node)
-      heredoc = node.opening_loc && node.opening_loc.slice =~ /\<\</
-      emit_code(node.opening_loc)
-      emit_newline if heredoc
-      last_part = nil
-      node.parts.each { |p|
-        if heredoc && last_part && p.location.start_line != last_part.location.start_line
-          emit_newline
-        end
-        emit_code(p)
-        last_part = p
-      }
-      emit_newline if heredoc
-      emit_code(node.closing_loc)
-    end
-    alias_method :visit_interpolated_string_node, :visit_interpolated_symbol_node
-
     def visit_index_operator_write_node(node)
       emit_code(node.receiver)
       emit_code(node.opening_loc)
@@ -421,11 +428,34 @@ module Steadfast
     end
     alias_method :visit_index_and_write_node, :visit_index_or_write_node
 
+    def visit_interpolated_match_last_line_node(node)
+      emit_code(node.opening_loc)
+      node.parts.each { |p| emit_code(p) }
+      emit_code(node.closing_loc)
+    end
+
     def visit_interpolated_regular_expression_node(node)
       emit_code(node.opening_loc)
       node.parts.each { |p| emit_code(p) }
       emit_code(node.closing_loc)
     end
+
+    def visit_interpolated_symbol_node(node)
+      heredoc = node.opening_loc && node.opening_loc.slice =~ /\<\</
+      emit_code(node.opening_loc)
+      emit_newline if heredoc
+      last_part = nil
+      node.parts.each { |p|
+        if heredoc && last_part && p.location.start_line != last_part.location.start_line
+          emit_newline
+        end
+        emit_code(p)
+        last_part = p
+      }
+      emit_newline if heredoc
+      emit_code(node.closing_loc)
+    end
+    alias_method :visit_interpolated_string_node, :visit_interpolated_symbol_node
 
     def visit_interpolated_x_string_node(node)
       emit_code(node.opening_loc)
@@ -511,6 +541,11 @@ module Steadfast
       emit_code(node.subsequent)
     end
 
+    def visit_shareable_constant_node(node)
+      emit("# shareable_constant_value: literal\n")
+      emit_code(node.write)
+    end
+    
     def visit_statements_node(node)
       first = true
       node.body&.each do |n|
