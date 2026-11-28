@@ -65,23 +65,31 @@ module Steadfast
       end
     end
 
+    # Computes the source location (filename and line no) for the given
+    # source_location spec. If source_location is nil, computes a random
+    # filename. If source_location is caller, returns the location of the
+    # callsite to eval_ast. Otherwise returns the given source location, with
+    # the lineno decremented (in order to compensate for the
+    # frozen_string_literal comment emitted before the code.
+    #
+    # @param source_location [Array, nil, :caller]
+    # @return [Array] [filename, lineno]
     def compute_eval_source_location(source_location)
       case source_location
       in nil
         # Important: ideally we'd set the source location line no to 0 (to
         # compensate for the #frozen_string_literal comment at the top).
         # However, while `eval` respects a starting lineno set to 0, Prism does
-        # not, which can lead to off-by-one line nos in exception backtraces for
+        # not, which can lead to off-by-one lineno in exception backtraces for
         # synthetic ASTs.
-        #
-        # Note that when source_location is not nil, we do decrement the start
-        # lineno. Hopefully some day this wart will be removed from Ruby.G
-        source_location = ["(steadfast-#{SecureRandom.hex(4)})", 1]
+        ["(steadfast-#{SecureRandom.hex(4)})", 1]
       in :caller
+        # Wwhen source_location is not nil, we do decrement the start lineno.
+        # Hopefully some day this wart will be removed from Ruby.G
         l = caller_locations[1]
-        source_location = [l.path, l.lineno - 1]
+        [l.path, l.lineno - 1]
       in [String => filename, Integer => lineno]
-        source_location = [filename, lineno - 1]
+        [filename, lineno - 1]
       else
         raise ArgumentError, "Invalid source_location given"
       end

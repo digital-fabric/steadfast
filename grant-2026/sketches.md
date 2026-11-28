@@ -2823,3 +2823,57 @@ node is a CallNode. We can also namespace the methods like we did for `quote`
 and `make`. So maybe something like `Steadfast.info(node)`, and then
 `Steadfast.call_info(node)` for specialized method.
 
+# 2026-11-27
+
+## Automatic backtrace translation
+
+The API for this is through `eval_ast`. Setting the option `translate_backtrace:
+true` will cause the returned eval_ast to contain a `begin... rescue...` block
+that calls `Steadfast::SourceMapping.translate_backtrace` for any exception that
+escapes from the code:
+
+- For each `DefNode`, wrap its body
+- For each lambda outside of a method definition, wrap its body
+- If a StatementsNode is returned, wrap it
+
+Some examples:
+
+```ruby
+# multiple statements
+ast = Steadfast.quote { foo; bar }
+
+# wrapped:
+begin
+  foo
+  bar
+rescue Exception => e
+  e.set_backtrace(Steadfast::SourceMapping.translate_backtrace(e.backtrace))
+  raise e
+end
+
+# lambda definition
+ast = Steadfast.quote { ->() { foo; bar } }
+
+# wrapped:
+->() {
+  begin
+    foo
+    bar
+  rescue Exception => e
+    e.set_backtrace(Steadfast::SourceMapping.translate_backtrace(e.backtrace))
+    raise e
+  end
+}
+
+# method definition
+ast = Steadfast.quote { def foo; ->() { 42 }; end }
+
+# wrapped:
+def foo
+  ->() { 42 }
+rescue Exception => e
+  e.set_backtrace(Steadfast::SourceMapping.translate_backtrace(e.backtrace))
+  raise e
+end
+```
+

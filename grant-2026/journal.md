@@ -230,13 +230,14 @@ I've also published a blog post describing the work done.
 
 ## Next on the plate
 
-- Add inline test using quote / unquote
-- Add more tests for emitting different node types / expression types
-- In eval_ast, add translate_backtrace option for wrapping the code in rescue
-  block with automatic backtrace translation
-- Change eval_ast to accept kwargs for options:
+- [ ] Add inline test using quote / unquote
+- [ ] Add more tests for emitting different node types / expression types
+- [ ] In eval_ast, add translate_backtrace option for wrapping the code in
+      rescue block with automatic backtrace translation
+- [v] Change eval_ast to accept kwargs for options:
   - receiver: receiver object
   - class: for doing class_eval
   - binding: binding
   - source_location:
   - translate_backtrace:
+- [v] Refactor core methods under `module Steadfast::AST`

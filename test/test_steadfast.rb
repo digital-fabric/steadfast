@@ -53,6 +53,40 @@ class EvalASTTest < Minitest::Test
     assert_equal 9, add1(7)
   end
 
+  class MyFoo
+  end
+
+  def test_eval_ast_class_receiver
+    ast = Steadfast.quote(nil) {
+      def foo; :bar; end
+    }
+    assert_equal false, MyFoo.instance_methods.include?(:foo)
+    Steadfast.eval_ast(ast, class: MyFoo)
+    assert_equal true, MyFoo.instance_methods.include?(:foo)
+  end
+
+  def test_eval_ast_binding
+    l = -> { x = 3; ->(y) { x + y } }.()
+    ast = Steadfast.to_ast(l)
+
+    wrapped = Steadfast.rewrite(ast) { |n|
+      next n if !(n in Ruby::Prism::CallNode)
+
+      Steadfast.quote(binding) { 3 + unquote(n) }
+    }
+    l2 = Steadfast.eval_ast(wrapped, binding: l.binding)
+    assert_equal 13, l2.(7)
+
+    l3 = Steadfast.eval_ast(wrapped, binding: binding)
+    assert_raises(NameError) { l3.(7) }
+
+    l4 = Steadfast.eval_ast(wrapped)
+    assert_raises(NameError) { l4.(7) }
+  rescue => e
+    p e
+    puts Steadfast::SourceMapping.translate_backtrace(e.backtrace).join("\n")
+  end
+
   def test_eval_ast_bad_ast
     assert_raises(ArgumentError) { Steadfast.eval_ast(nil) }
     assert_raises(ArgumentError) { Steadfast.eval_ast(-> { 1 }) }
