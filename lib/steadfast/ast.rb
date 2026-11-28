@@ -50,11 +50,13 @@ module Steadfast
     # @param receiver: [any, nil] instance_eval receiver
     # @param class: [Class, nil] class_eval receiver
     # @param binding: [Binding, nil] binding
+    # @param translate_backtrace [true, false] auto translate exception backtraces
     # @return [any]
     def eval_ast(ast, source_location: nil, **opts)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
 
       source_location = compute_eval_source_location(source_location)
+      ast = eval_ast_translate_backtrace(ast) if opts[:translate_backtrace]
       src = to_source(ast, source_location:, sourcemap: true, frozen_string_literal: true)
       if (receiver = opts[:receiver])
         receiver.instance_eval(src, *source_location)
@@ -62,36 +64,6 @@ module Steadfast
         receiver.class_eval(src, *source_location)
       else
         eval(src, opts[:binding], *source_location)
-      end
-    end
-
-    # Computes the source location (filename and line no) for the given
-    # source_location spec. If source_location is nil, computes a random
-    # filename. If source_location is caller, returns the location of the
-    # callsite to eval_ast. Otherwise returns the given source location, with
-    # the lineno decremented (in order to compensate for the
-    # frozen_string_literal comment emitted before the code.
-    #
-    # @param source_location [Array, nil, :caller]
-    # @return [Array] [filename, lineno]
-    def compute_eval_source_location(source_location)
-      case source_location
-      in nil
-        # Important: ideally we'd set the source location line no to 0 (to
-        # compensate for the #frozen_string_literal comment at the top).
-        # However, while `eval` respects a starting lineno set to 0, Prism does
-        # not, which can lead to off-by-one lineno in exception backtraces for
-        # synthetic ASTs.
-        ["(steadfast-#{SecureRandom.hex(4)})", 1]
-      in :caller
-        # Wwhen source_location is not nil, we do decrement the start lineno.
-        # Hopefully some day this wart will be removed from Ruby.G
-        l = caller_locations[1]
-        [l.path, l.lineno - 1]
-      in [String => filename, Integer => lineno]
-        [filename, lineno - 1]
-      else
-        raise ArgumentError, "Invalid source_location given"
       end
     end
 
@@ -136,6 +108,81 @@ module Steadfast
     def set_source_filename(ast, obj)
       source = ast.send(:source)
       source.__filename__ ||= obj.source_location.first
+    end
+
+    # Computes the source location (filename and line no) for the given
+    # source_location spec. If source_location is nil, computes a random
+    # filename. If source_location is caller, returns the location of the
+    # callsite to eval_ast. Otherwise returns the given source location, with
+    # the lineno decremented (in order to compensate for the
+    # frozen_string_literal comment emitted before the code.
+    #
+    # @param source_location [Array, nil, :caller]
+    # @return [Array] [filename, lineno]
+    def compute_eval_source_location(source_location)
+      case source_location
+      in nil
+        # Important: ideally we'd set the source location line no to 0 (to
+        # compensate for the #frozen_string_literal comment at the top).
+        # However, while `eval` respects a starting lineno set to 0, Prism does
+        # not, which can lead to off-by-one lineno in exception backtraces for
+        # synthetic ASTs.
+        ["(steadfast-#{SecureRandom.hex(4)})", 1]
+      in :caller
+        # Wwhen source_location is not nil, we do decrement the start lineno.
+        # Hopefully some day this wart will be removed from Ruby.G
+        l = caller_locations[1]
+        [l.path, l.lineno - 1]
+      in [String => filename, Integer => lineno]
+        [filename, lineno - 1]
+      else
+        raise ArgumentError, "Invalid source_location given"
+      end
+    end
+
+    # Translates the given AST by inserting a backtrace translation rescue
+    # block. All method and lambda definitions will be rewritten to include
+    # backtrace translation, as well as the top-level node.
+    #
+    # @param ast [Ruby::Prism::Node]
+    # @return [Ruby::Prism::Node]
+    def eval_ast_translate_backtrace(ast)
+      ast = Steadfast.rewrite(ast) do |n|
+        case n
+        when Ruby::Prism::DefNode, Ruby::Prism::LambdaNode
+          Steadfast.rewrite(n, n.body => eval_ast_wrapper_ast(n.body))
+        else
+          n
+        end
+      end
+      
+      case ast
+      when Ruby::Prism::DefNode, Ruby::Prism::LambdaNode
+        ast
+      else
+        eval_ast_wrapper_ast(ast)
+      end
+    end
+
+    # Returns an AST wrapping the given statements with a rescue block that
+    # translates an unhandled exception's backtrace for source mapping purposes.
+    # If the given node is anything other than a StatementsNode, it is wrapped
+    # in a StatementsNode.
+    #
+    # @param statements [Ruby::Prism::Node]
+    # @return [Ruby::Prism::Node]
+    def eval_ast_wrapper_ast(statements)
+      if !statements.is_a?(Ruby::Prism::StatementsNode)
+        statements = Steadfast.make_statements([statements])
+      end
+      Steadfast.quote(binding) {
+        begin
+          unquote(statements)
+        rescue Exception => e
+          e.set_backtrace(Steadfast::SourceMapping.translate_backtrace(e.backtrace))
+          raise
+        end
+      }      
     end
 
     # Finds the AST for the given proc. This method is currently not in use, but

@@ -14,6 +14,23 @@ module Kernel
   end
 end
 
+class Minitest::Test
+  def capture_exception
+    yield
+    nil
+  rescue => e
+    e
+  end
+
+  def bt_entry_location(entry)
+    if (m = entry.match(/^([^\:]+)\:(\d+)/))
+      [m[1], m[2].to_i]
+    else
+      nil
+    end
+  end
+end
+
 module Minitest::Assertions
   def assert_source_match exp, act
     exp = format_src(exp)
