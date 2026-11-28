@@ -232,7 +232,7 @@ I've also published a blog post describing the work done.
 
 - [ ] Add inline test using quote / unquote
 - [ ] Add more tests for emitting different node types / expression types
-- [ ] In eval_ast, add translate_backtrace option for wrapping the code in
+- [v] In eval_ast, add translate_backtrace option for wrapping the code in
       rescue block with automatic backtrace translation
 - [v] Change eval_ast to accept kwargs for options:
   - receiver: receiver object

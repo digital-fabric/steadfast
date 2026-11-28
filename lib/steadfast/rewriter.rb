@@ -14,7 +14,7 @@ module Steadfast
     # @return [Ruby::Prism::Node]
     def self.rewrite(ast, **replacements, &rewrite_block)
       raise ArgumentError, "Not an AST" if !ast.is_a?(Ruby::Prism::Node)
-      
+
       rewrite_block ||= ->(n) do
         if (v = replacements[n]) && v.is_a?(Hash)
           n.copy(**v)

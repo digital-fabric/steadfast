@@ -3,7 +3,7 @@
   Foo &&= 1
   Foo ||= 1
   Foo += 1
-  
+
   Foo::Bar = 1
   Foo::Bar &&= 1
   Foo::Bar ||= 1

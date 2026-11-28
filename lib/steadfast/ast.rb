@@ -155,7 +155,7 @@ module Steadfast
           n
         end
       end
-      
+
       case ast
       when Ruby::Prism::DefNode, Ruby::Prism::LambdaNode
         ast
@@ -182,7 +182,7 @@ module Steadfast
           e.set_backtrace(Steadfast::SourceMapping.translate_backtrace(e.backtrace))
           raise
         end
-      }      
+      }
     end
 
     # Finds the AST for the given proc. This method is currently not in use, but

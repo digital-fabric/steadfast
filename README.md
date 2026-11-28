@@ -96,7 +96,7 @@ ast = Steadfast.to_ast(->() { foo() })
 ast2 = Steadfast.rewrite(ast) { |n|
   # use next to allow the iteration to continue
   next n if !(n in Ruby::Prism::CallNode(name: :foo))
- 
+
   Steadfast.quote { bar() }
 }
 ```

@@ -153,7 +153,7 @@ class EvalASTTest < Minitest::Test
     e = capture_exception { Steadfast.eval_ast(ast, binding:, translate_backtrace: true) }
     assert_equal [:hi], buf
     assert_kind_of MyError, e
-    assert_match /^#{__FILE__}:#{line}/, e.backtrace[0]    
+    assert_match /^#{__FILE__}:#{line}/, e.backtrace[0]
   end
 
   def test_eval_ast_translate_backtrace_lambdas
@@ -165,12 +165,12 @@ class EvalASTTest < Minitest::Test
         raise MyError
       }
     }
-  
+
     e = capture_exception { Steadfast.eval_ast(ast, binding:).() }
     assert_equal [:hi], buf
     assert_kind_of MyError, e
     assert_match /^\(steadfast.+/, e.backtrace[0]
-  
+
     buf = []
     e = capture_exception { Steadfast.eval_ast(ast, binding:, translate_backtrace: true).() }
     assert_kind_of MyError, e
@@ -189,7 +189,7 @@ class EvalASTTest < Minitest::Test
     e = capture_exception { bt_foo1 }
     assert_kind_of MyError, e
     assert_match /^\(steadfast.+/, e.backtrace[0]
-  
+
     Steadfast.eval_ast(ast, binding:, translate_backtrace: true)
     e = capture_exception { bt_foo1 }
     assert_kind_of MyError, e
@@ -201,11 +201,11 @@ class EvalASTTest < Minitest::Test
     ast = Steadfast.quote(binding) {
       raise MyError
     }
-  
+
     e = capture_exception { Steadfast.eval_ast(ast, binding:) }
     assert_kind_of MyError, e
     assert_match /^\(steadfast.+/, e.backtrace[0]
-  
+
     buf = []
     e = capture_exception { Steadfast.eval_ast(ast, binding:, translate_backtrace: true) }
     assert_kind_of MyError, e

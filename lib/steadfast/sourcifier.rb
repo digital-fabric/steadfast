@@ -547,7 +547,7 @@ module Steadfast
       emit("# shareable_constant_value: literal\n")
       emit_code(node.write)
     end
-    
+
     def visit_statements_node(node)
       first = true
       node.body&.each do |n|

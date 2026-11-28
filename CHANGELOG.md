@@ -1,3 +1,10 @@
+# 0.7.0 2026-11-28
+
+- Add support for automatic backtrace translation in `eval_ast`
+- Streamline `eval_ast` options, add support for class_eval
+- Move core methods to `Steadfast::AST` module
+- Add support for `PreExecutionNode`, `PostExecutionNode`
+
 # 0.6.0 2026-11-27
 
 - Add support for emit-nothing with `unquote(:__nop__)`

@@ -122,7 +122,7 @@ class QuoteTest < Minitest::Test
     assert_source_match "42; 43", Steadfast.to_source(n)
   end
 
-  def test_quote_unquote_nop    
+  def test_quote_unquote_nop
     n1 = quote(binding) {
       -> {
         foo

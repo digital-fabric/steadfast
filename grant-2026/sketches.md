@@ -2537,7 +2537,7 @@ end
 
 ## Specialization - Determining which nodes are static
 
-Some performance considerations. We want to be able to 
+Some performance considerations. We want to be able to
 
 ```ruby
 def specialize(ast)
@@ -2686,8 +2686,8 @@ Steadfast.rewrite(ast) { |n|
   next n if !on
 
   name = :"after_#{on.value.unescaped}_commit"
-   
-  quote {  
+
+  quote {
     __.call(name: unquote(name), arguments: unquote(n.arguments.arguments[0]))
   }
 }
@@ -2729,8 +2729,8 @@ selector.map { |s| # yields a selector for each node
   on_kwarg = s.kwarg(:on)
   s.call_kwargs
   name = :"after_#{on.value.unescaped}_commit"
-   
-  quote {  
+
+  quote {
     __.call(name: unquote(name), arguments: unquote(n.arguments.arguments[0]))
   }
 }
@@ -2763,7 +2763,7 @@ Steadfast.rewrite(ast) { |n|
   kwargs = q.arguments[:kwargs]
   next n if !kwargs[:on]
 
-  quote {  
+  quote {
     __.call(name: :"after_#{kwargs[:on]}_commit", arguments: unquote(pargs))
   }
 }
@@ -2774,7 +2774,7 @@ specialized in specific node types. Let's take another example:
 
 ```ruby
 def convert_tail_call(tail, params)
-  
+
   lvars = [*params.requireds.map(&:name), *params.optionals.map(&:name)]
   values = tail.arguments.arguments
 

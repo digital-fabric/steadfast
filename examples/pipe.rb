@@ -44,7 +44,7 @@ def rewrite_pipe(meth)
   puts
   Steadfast.eval_ast(ast2, meth.receiver)
 end
-  
+
 rewrite_pipe(method(:compute_with))
 
 p result: compute_with(42)
